@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "GC Manager",
+        "description": "Manage Python garbage collection to keep gen-2 pauses small on a large instance.",
+        "data": {
+          "freeze_on_start": "Freeze the heap after startup",
+          "startup_delay_seconds": "Settle delay after an HA restart before the first freeze (seconds; 0 = immediate). Ignored on install/reload.",
+          "refreeze_interval_hours": "Periodic re-freeze interval (hours, 0 = off; rounded to a divisor of 24 and aligned to the maintenance time)",
+          "daily_maintenance": "Daily unfreeze + collect + freeze (if off, the periodic re-freeze does this reset instead)",
+          "daily_time": "Daily maintenance time",
+          "set_thresholds": "Override GC thresholds",
+          "threshold_gen0": "Gen-0 threshold",
+          "threshold_gen1": "Gen-1 threshold",
+          "threshold_gen2": "Gen-2 threshold"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "GC Manager is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "GC Manager options",
+        "data": {
+          "freeze_on_start": "Freeze the heap after startup",
+          "startup_delay_seconds": "Settle delay after an HA restart before the first freeze (seconds; 0 = immediate). Ignored on install/reload.",
+          "refreeze_interval_hours": "Periodic re-freeze interval (hours, 0 = off; rounded to a divisor of 24 and aligned to the maintenance time)",
+          "daily_maintenance": "Daily unfreeze + collect + freeze (if off, the periodic re-freeze does this reset instead)",
+          "daily_time": "Daily maintenance time",
+          "set_thresholds": "Override GC thresholds",
+          "threshold_gen0": "Gen-0 threshold",
+          "threshold_gen1": "Gen-1 threshold",
+          "threshold_gen2": "Gen-2 threshold"
+        }
+      }
+    }
+  },
+  "services": {
+    "freeze": {
+      "name": "Freeze",
+      "description": "Run gc.collect() then gc.freeze() now, absorbing current long-lived objects into the frozen set."
+    },
+    "unfreeze": {
+      "name": "Unfreeze",
+      "description": "Return all frozen objects to normal garbage collection."
+    },
+    "maintain": {
+      "name": "Maintain",
+      "description": "Run unfreeze + collect + freeze now (the full daily-maintenance reset) to reclaim frozen-then-dead objects."
+    }
+  }
+}
