@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <g fill="#2f6fed">
+    <!-- handle -->
+    <rect x="100" y="44" width="56" height="22" rx="11"/>
+    <!-- lid -->
+    <rect x="46" y="66" width="164" height="26" rx="10"/>
+    <!-- body (tapered bin) -->
+    <path d="M68 100 H188 L175 208 A16 16 0 0 1 159 222 H97 A16 16 0 0 1 81 208 Z"/>
+  </g>
+  <!-- code </> on the bin -->
+  <g fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="106,132 86,161 106,190"/>
+    <line x1="140" y1="128" x2="116" y2="194"/>
+    <polyline points="150,132 170,161 150,190"/>
+  </g>
+</svg>
