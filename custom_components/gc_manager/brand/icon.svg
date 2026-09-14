@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <circle cx="128" cy="128" r="128" fill="#2e9e5b"/>
+  <g fill="#ffffff">
+    <!-- handle -->
+    <rect x="107" y="58" width="42" height="15" rx="7"/>
+    <!-- lid (overhangs the bin) -->
+    <rect x="60" y="76" width="136" height="20" rx="10"/>
+    <!-- bin body -->
+    <path d="M78 102 H178 L167 192 A16 16 0 0 1 151 206 H105 A16 16 0 0 1 89 192 Z"/>
+  </g>
+  <!-- ribs cut in the background green -->
+  <g stroke="#2e9e5b" stroke-width="10" stroke-linecap="round">
+    <line x1="110" y1="118" x2="107" y2="188"/>
+    <line x1="128" y1="118" x2="128" y2="188"/>
+    <line x1="146" y1="118" x2="149" y2="188"/>
+  </g>
+</svg>

@@ -1,0 +1,14 @@
+{
+  "domain": "gc_manager",
+  "name": "GC Manager",
+  "codeowners": [
+    "@bakerkj"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/bakerkj/ha-gc-manager",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/bakerkj/ha-gc-manager/issues",
+  "single_config_entry": true,
+  "version": "0.0.0"
+}
