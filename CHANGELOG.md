@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.3](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.2...v0.0.3) (2026-09-19)
+
+
+### Bug Fixes
+
+* **renovate:** don't duplicate runs-on detection with the built-in manager ([#19](https://github.com/bakerkj/ha-gc-manager/issues/19)) ([fdf95c6](https://github.com/bakerkj/ha-gc-manager/commit/fdf95c6afc884445761a9784698134e165aa26a8))
+
+
+### Miscellaneous Chores
+
+* **deps:** update anthropics/claude-code-action action to v1.0.225 ([#14](https://github.com/bakerkj/ha-gc-manager/issues/14)) ([d08656f](https://github.com/bakerkj/ha-gc-manager/commit/d08656fbf6f20107c9dbb0b258c1d66984a8031f))
+* **deps:** update anthropics/claude-code-action action to v1.0.226 ([#25](https://github.com/bakerkj/ha-gc-manager/issues/25)) ([a74d53d](https://github.com/bakerkj/ha-gc-manager/commit/a74d53df25da9b960b33fdb296a7aa166ff22b1c))
+* **deps:** update anthropics/claude-code-action action to v1.0.231 ([#26](https://github.com/bakerkj/ha-gc-manager/issues/26)) ([e11bb36](https://github.com/bakerkj/ha-gc-manager/commit/e11bb364751a747d1ff647dbe0bad65f8e788c69))
+* **deps:** update dependency ubuntu to v26 ([#17](https://github.com/bakerkj/ha-gc-manager/issues/17)) ([7537a98](https://github.com/bakerkj/ha-gc-manager/commit/7537a98aa25bd17024e1d6bcc74c95711d795a16))
+* **deps:** update dependency uv to v0.12.14 ([#15](https://github.com/bakerkj/ha-gc-manager/issues/15)) ([9a93147](https://github.com/bakerkj/ha-gc-manager/commit/9a93147258edb88028851a513299fad0a810f64e))
+* **deps:** update dependency uv to v0.12.15 ([#21](https://github.com/bakerkj/ha-gc-manager/issues/21)) ([7ec2258](https://github.com/bakerkj/ha-gc-manager/commit/7ec2258bc0e374736244b4947c5e7df3fa49989c))
+* **deps:** update dependency uv to v0.12.17 ([#23](https://github.com/bakerkj/ha-gc-manager/issues/23)) ([f45428f](https://github.com/bakerkj/ha-gc-manager/commit/f45428f42f38e1bb49cbe7432b58ad9d2af4cd4b))
+* **deps:** update pre-commit hook rbubley/mirrors-prettier to v3.9.7 ([#22](https://github.com/bakerkj/ha-gc-manager/issues/22)) ([83fbe34](https://github.com/bakerkj/ha-gc-manager/commit/83fbe3417fe55f8de068a4fb439265389c474ff2))
+* **deps:** update pre-commit hooks ([#24](https://github.com/bakerkj/ha-gc-manager/issues/24)) ([d7ce737](https://github.com/bakerkj/ha-gc-manager/commit/d7ce737d71fed6889f3e8e5acd09bbbf16331d5d))
+* switch actionlint pre-commit hook from rhysd (stale) to kjanat fork ([#20](https://github.com/bakerkj/ha-gc-manager/issues/20)) ([fe0d55f](https://github.com/bakerkj/ha-gc-manager/commit/fe0d55fa1820751a244579d8a198f4fc3677db54))
+
 ## [0.0.2](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.1...v0.0.2) (2026-09-14)
 
 
