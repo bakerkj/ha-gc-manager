@@ -18,6 +18,7 @@ from .const import (
     CONF_DAILY_MAINTENANCE,
     CONF_DAILY_TIME,
     CONF_FREEZE_ON_START,
+    CONF_PAUSE_GC_UNTIL_FREEZE,
     CONF_REFREEZE_INTERVAL_HOURS,
     CONF_SET_THRESHOLDS,
     CONF_STARTUP_DELAY_SECONDS,
@@ -28,6 +29,7 @@ from .const import (
     DEFAULT_DAILY_TIME,
     DEFAULT_FREEZE_ON_START,
     DEFAULT_NAME,
+    DEFAULT_PAUSE_GC_UNTIL_FREEZE,
     DEFAULT_REFREEZE_INTERVAL_HOURS,
     DEFAULT_SET_THRESHOLDS,
     DEFAULT_STARTUP_DELAY_SECONDS,
@@ -70,6 +72,12 @@ def _build_schema(source: Mapping[str, Any]) -> vol.Schema:
                     unit_of_measurement="s",
                 )
             ),
+            vol.Required(
+                CONF_PAUSE_GC_UNTIL_FREEZE,
+                default=source.get(
+                    CONF_PAUSE_GC_UNTIL_FREEZE, DEFAULT_PAUSE_GC_UNTIL_FREEZE
+                ),
+            ): selector.BooleanSelector(),
             vol.Required(
                 CONF_REFREEZE_INTERVAL_HOURS,
                 default=source.get(

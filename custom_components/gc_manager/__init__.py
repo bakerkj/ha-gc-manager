@@ -30,6 +30,7 @@ from .const import (
     CONF_DAILY_MAINTENANCE,
     CONF_DAILY_TIME,
     CONF_FREEZE_ON_START,
+    CONF_PAUSE_GC_UNTIL_FREEZE,
     CONF_REFREEZE_INTERVAL_HOURS,
     CONF_SET_THRESHOLDS,
     CONF_STARTUP_DELAY_SECONDS,
@@ -39,6 +40,7 @@ from .const import (
     DEFAULT_DAILY_MAINTENANCE,
     DEFAULT_DAILY_TIME,
     DEFAULT_FREEZE_ON_START,
+    DEFAULT_PAUSE_GC_UNTIL_FREEZE,
     DEFAULT_REFREEZE_INTERVAL_HOURS,
     DEFAULT_SET_THRESHOLDS,
     DEFAULT_STARTUP_DELAY_SECONDS,
@@ -46,6 +48,7 @@ from .const import (
     DEFAULT_THRESHOLD_GEN1,
     DEFAULT_THRESHOLD_GEN2,
     DOMAIN,
+    PAUSE_GC_WATCHDOG_SECONDS,
     PLATFORMS,
     SERVICE_FREEZE,
     SERVICE_MAINTAIN,
@@ -133,7 +136,27 @@ def _arm_startup_freeze(
     delay = int(source.get(CONF_STARTUP_DELAY_SECONDS, DEFAULT_STARTUP_DELAY_SECONDS))
 
     async def _startup_freeze(_arg=None) -> None:
-        await controller.async_collect_and_freeze("startup freeze")
+        try:
+            await controller.async_collect_and_freeze("startup freeze")
+        finally:
+            controller.resume_automatic()
+
+    # Only on a real start: on an install or reload the freeze is immediate and
+    # there is no startup to get through.
+    pause_wanted = not was_running and source.get(
+        CONF_PAUSE_GC_UNTIL_FREEZE, DEFAULT_PAUSE_GC_UNTIL_FREEZE
+    )
+    if pause_wanted and controller.pause_automatic():
+
+        @callback
+        def _watchdog(_now) -> None:
+            if controller.resume_automatic():
+                _LOGGER.warning(
+                    "startup freeze had not run after %ds; automatic gc resumed",
+                    PAUSE_GC_WATCHDOG_SECONDS,
+                )
+
+        data.unsubs.append(async_call_later(hass, PAUSE_GC_WATCHDOG_SECONDS, _watchdog))
 
     @callback
     def _on_started(_hass: HomeAssistant) -> None:
@@ -259,6 +282,7 @@ def _teardown(hass: HomeAssistant, entry: ConfigEntry, data: GcManagerData) -> N
     for unsub in data.unsubs:
         unsub()
     data.unsubs.clear()
+    data.controller.resume_automatic()
     data.controller.restore_thresholds()
     data.controller.stop()
 

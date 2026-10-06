@@ -142,6 +142,22 @@ _SINGLETON: tuple[GcSensorDescription, ...] = (
             else None
         ),
     ),
+    GcSensorDescription(
+        key="pause_count",
+        name="Gen-2 pauses",
+        icon="mdi:pause-circle-outline",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda c: c.pause_count,
+    ),
+    GcSensorDescription(
+        key="pause_total",
+        name="Gen-2 pause time",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=0,
+        value_fn=lambda c: round(c.pause_total_ms, 1),
+    ),
 )
 
 
