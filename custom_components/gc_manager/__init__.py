@@ -32,6 +32,7 @@ from .const import (
     CONF_DAILY_TIME,
     CONF_FREEZE_ON_START,
     CONF_REFREEZE_INTERVAL_HOURS,
+    CONF_SAMPLE_INTERVAL_MINUTES,
     CONF_SET_THRESHOLDS,
     CONF_STARTUP_DELAY_SECONDS,
     CONF_THRESHOLD_GEN0,
@@ -42,6 +43,7 @@ from .const import (
     DEFAULT_DAILY_TIME,
     DEFAULT_FREEZE_ON_START,
     DEFAULT_REFREEZE_INTERVAL_HOURS,
+    DEFAULT_SAMPLE_INTERVAL_MINUTES,
     DEFAULT_SET_THRESHOLDS,
     DEFAULT_STARTUP_DELAY_SECONDS,
     DEFAULT_THRESHOLD_GEN0,
@@ -64,7 +66,6 @@ _SERVICES = (SERVICE_FREEZE, SERVICE_UNFREEZE, SERVICE_MAINTAIN)
 
 # Cadence for sampling the (heap-walking) non-frozen tracked-object count, done
 # off the loop so the sensor read itself is cheap.
-_TRACKED_SAMPLE_INTERVAL = timedelta(minutes=5)
 
 
 @dataclass
@@ -197,9 +198,12 @@ def _arm_entry(
             return
         await controller.async_refresh_counts()
 
-    data.unsubs.append(
-        async_track_time_interval(hass, _sample_counts, _TRACKED_SAMPLE_INTERVAL)
+    sample_interval = timedelta(
+        minutes=int(
+            source.get(CONF_SAMPLE_INTERVAL_MINUTES, DEFAULT_SAMPLE_INTERVAL_MINUTES)
+        )
     )
+    data.unsubs.append(async_track_time_interval(hass, _sample_counts, sample_interval))
     entry.async_create_background_task(
         hass, _sample_counts(), "gc_manager_sample_counts"
     )
