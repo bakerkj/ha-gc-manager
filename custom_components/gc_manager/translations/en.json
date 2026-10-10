@@ -19,6 +19,10 @@
         }
       }
     },
+    "error": {
+      "pause_requires_freeze_on_start": "Pause automatic GC needs the startup freeze; otherwise the pause has no finisher.",
+      "startup_delay_exceeds_pause_watchdog": "Startup delay must be under the pause watchdog when pausing GC; otherwise the failsafe resumes GC before the freeze runs."
+    },
     "abort": {
       "single_instance_allowed": "GC Manager is already configured."
     }

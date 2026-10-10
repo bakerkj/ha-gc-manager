@@ -45,6 +45,7 @@ from .const import (
     MIN_REFREEZE_INTERVAL_HOURS,
     MIN_SAMPLE_INTERVAL_MINUTES,
     MIN_STARTUP_DELAY_SECONDS,
+    PAUSE_GC_WATCHDOG_SECONDS,
     UNIQUE_ID,
 )
 
@@ -155,9 +156,14 @@ class GcManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="single_instance_allowed")
 
         if user_input is not None:
-            await self.async_set_unique_id(UNIQUE_ID)
-            self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=DEFAULT_NAME, data=user_input)
+            errors = _validate_pause_combo(user_input)
+            if not errors:
+                await self.async_set_unique_id(UNIQUE_ID)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=DEFAULT_NAME, data=user_input)
+            return self.async_show_form(
+                step_id="user", data_schema=_build_schema(user_input), errors=errors
+            )
 
         return self.async_show_form(step_id="user", data_schema=_build_schema({}))
 
@@ -167,7 +173,34 @@ class GcManagerOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            errors = _validate_pause_combo(user_input)
+            if not errors:
+                return self.async_create_entry(title="", data=user_input)
+            return self.async_show_form(
+                step_id="init", data_schema=_build_schema(user_input), errors=errors
+            )
 
         source = {**self.config_entry.data, **self.config_entry.options}
         return self.async_show_form(step_id="init", data_schema=_build_schema(source))
+
+
+def _validate_pause_combo(user_input: Mapping[str, Any]) -> dict[str, str]:
+    """Enforce the two pause_gc_until_freeze invariants.
+
+    Without a startup freeze there is no finisher for the pause; with a
+    startup delay beyond the watchdog the failsafe preempts the freeze.
+    """
+    errors: dict[str, str] = {}
+    if not user_input.get(CONF_PAUSE_GC_UNTIL_FREEZE):
+        return errors
+    if not user_input.get(CONF_FREEZE_ON_START):
+        errors[CONF_PAUSE_GC_UNTIL_FREEZE] = "pause_requires_freeze_on_start"
+    # `>=` not `>`: the watchdog is armed at setup (T=0, fires T=watchdog); the
+    # freeze delay only arms after `async_at_started` (T=S, fires T=S+delay). On
+    # any real cold boot S>0, so delay == watchdog loses the race too.
+    if (
+        int(user_input.get(CONF_STARTUP_DELAY_SECONDS, DEFAULT_STARTUP_DELAY_SECONDS))
+        >= PAUSE_GC_WATCHDOG_SECONDS
+    ):
+        errors[CONF_STARTUP_DELAY_SECONDS] = "startup_delay_exceeds_pause_watchdog"
+    return errors
