@@ -43,6 +43,16 @@ MAX_SAMPLE_INTERVAL_MINUTES: Final = 60
 # of 24 and aligned to a wall-clock grid phased off the maintenance time (see
 # refreeze_slots) so runs stay evenly spaced regardless of when HA started.
 CONF_REFREEZE_INTERVAL_HOURS: Final = "refreeze_interval_hours"
+# Keep automatic collection off from the moment this integration loads until
+# the startup freeze has run. A start allocates millions of long-lived objects,
+# and every full collection during it walks all of them (0.7-1.5 s each on a
+# large instance) to find almost nothing; the startup freeze collects once,
+# properly, at the end. Costs some memory for those minutes.
+CONF_PAUSE_GC_UNTIL_FREEZE: Final = "pause_gc_until_freeze"
+DEFAULT_PAUSE_GC_UNTIL_FREEZE: Final = False
+# Automatic collection comes back after this long whatever happened, so a
+# startup that never reaches its freeze cannot leave it off.
+PAUSE_GC_WATCHDOG_SECONDS: Final = 900
 DEFAULT_REFREEZE_INTERVAL_HOURS: Final = 6
 MIN_REFREEZE_INTERVAL_HOURS: Final = 0
 MAX_REFREEZE_INTERVAL_HOURS: Final = 24

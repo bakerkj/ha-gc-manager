@@ -58,6 +58,7 @@ class GcController:
         self._log = logger
         self._lock = asyncio.Lock()
         self.last_result: GcResult | None = None
+        self._paused_automatic = False
         self.last_freeze_at: datetime | None = None  # last op that ended in freeze()
         # Object counts sampled off the loop — gc.get_freeze_count() walks the
         # permanent set and len(gc.get_objects()) the tracked set, both O(heap),
@@ -70,6 +71,9 @@ class GcController:
         self.last_pause_ms: float | None = None
         self.last_pause_at: datetime | None = None
         self.peak_pause_ms: float | None = None
+        # Every automatic gen-2 pause since this controller started, added up.
+        self.pause_count = 0
+        self.pause_total_ms = 0.0
         self._pause_start: float | None = None
         # Thread of our own in-flight forced collect; the probe skips a collection
         # only on this thread, so an organic one on another thread still records.
@@ -129,11 +133,35 @@ class GcController:
         elapsed = (time.perf_counter() - self._pause_start) * 1000.0
         self._pause_start = None
         self.last_pause_ms = elapsed
+        self.pause_count += 1
+        self.pause_total_ms += elapsed
         self.last_pause_at = dt_util.utcnow()
         # Read once: a loop-thread freeze can null peak_pause_ms mid-compare, so a
         # two-read max(None, elapsed) would raise here on the collecting thread.
         peak = self.peak_pause_ms
         self.peak_pause_ms = elapsed if peak is None else max(peak, elapsed)
+
+    def pause_automatic(self) -> bool:
+        """Turn automatic collection off, if it is on. Undone by resume_automatic.
+
+        Only ever undoes its own pause: if something else had already disabled
+        the collector, it is left that way.
+        """
+        if self._paused_automatic or not gc.isenabled():
+            return False
+        gc.disable()
+        self._paused_automatic = True
+        self._log.info("automatic gc paused until the startup freeze")
+        return True
+
+    def resume_automatic(self) -> bool:
+        """Turn automatic collection back on, if pause_automatic turned it off."""
+        if not self._paused_automatic:
+            return False
+        self._paused_automatic = False
+        gc.enable()
+        self._log.info("automatic gc resumed")
+        return True
 
     async def async_collect_and_freeze(self, action: str) -> GcResult:
         """collect() then freeze() — absorb current survivors into the frozen set.
