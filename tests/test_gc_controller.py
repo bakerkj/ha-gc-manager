@@ -286,3 +286,91 @@ def test_gen2_pauses_are_counted_and_added_up(hass):
             controller.pause_total_ms >= 0
             and controller.pause_total_ms == pytest.approx(controller.pause_total_ms)
         )
+
+
+@pytest.mark.parametrize("operation", ["freeze", "maintenance", "unfreeze"])
+async def test_cancellation_holds_lock_until_worker_finishes(hass, operation):
+    g = _const_gc()
+    entered, release = threading.Event(), threading.Event()
+
+    def _blocked():
+        entered.set()
+        assert release.wait(5)
+        return 1
+
+    if operation == "unfreeze":
+        g.unfreeze.side_effect = _blocked
+    else:
+        g.collect.side_effect = _blocked
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        operations = {
+            "freeze": lambda: controller.async_collect_and_freeze("cancelled freeze"),
+            "maintenance": controller.async_maintenance,
+            "unfreeze": controller.async_unfreeze,
+        }
+        task = asyncio.create_task(operations[operation]())
+        follower = None
+        try:
+            assert await hass.async_add_executor_job(entered.wait, 2)
+            task.cancel()
+            await asyncio.sleep(0)
+            task.cancel()  # repeated cancellation must not abandon the worker either
+            await asyncio.sleep(0)
+            follower = asyncio.create_task(controller.async_unfreeze())
+            await asyncio.sleep(0)
+            assert not task.done()
+            assert not follower.done()
+            assert controller._lock.locked()
+        finally:
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            if follower is not None:
+                await follower
+        assert controller.last_result.action == "unfreeze"
+        if operation != "unfreeze":
+            assert controller.last_freeze_at is not None
+            names = [call[0] for call in g.method_calls]
+            assert names.index("freeze") < len(names) - 2
+        else:
+            assert controller.last_freeze_at is None
+
+
+async def test_close_drains_worker_and_rejects_queued_operations(hass):
+    g = _const_gc()
+    entered, release = threading.Event(), threading.Event()
+
+    def _collect():
+        entered.set()
+        assert release.wait(5)
+        return 1
+
+    g.collect.side_effect = _collect
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        task = asyncio.create_task(controller.async_collect_and_freeze("in flight"))
+        queued = close = None
+        try:
+            assert await hass.async_add_executor_job(entered.wait, 2)
+            queued = asyncio.create_task(controller.async_maintenance())
+            await asyncio.sleep(0)
+            close = asyncio.create_task(controller.async_close())
+            await asyncio.sleep(0)
+            close.cancel()
+            await asyncio.sleep(0)
+            assert not close.done()
+        finally:
+            release.set()
+            result = await task
+            if queued is not None:
+                assert await queued is None
+            if close is not None:
+                with pytest.raises(asyncio.CancelledError):
+                    await close
+        assert controller.last_result is result
+        assert controller.last_freeze_at == result.at
+        assert not controller._lock.locked()
+        g.collect.assert_called_once()
+        g.freeze.assert_called_once()
+        g.unfreeze.assert_not_called()

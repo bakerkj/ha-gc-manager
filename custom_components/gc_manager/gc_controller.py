@@ -31,6 +31,24 @@ from homeassistant.util import dt as dt_util
 _FULL_GENERATION = 2
 
 
+async def _async_wait[T](
+    worker: asyncio.Future[T], completed: Callable[[T], None] | None = None
+) -> T:
+    """Delay cancellation until executor work (and its bookkeeping) finishes."""
+    cancelled = None
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError as err:
+            cancelled = err
+    result = worker.result()
+    if completed is not None:
+        completed(result)
+    if cancelled is not None:
+        raise cancelled
+    return result
+
+
 @dataclass(slots=True)
 class GcResult:
     """Outcome of one GC operation, for logging and the diagnostic sensor."""
@@ -57,6 +75,7 @@ class GcController:
         self._hass = hass
         self._log = logger
         self._lock = asyncio.Lock()
+        self._closing = False
         self.last_result: GcResult | None = None
         self._paused_automatic = False
         self.last_freeze_at: datetime | None = None  # last op that ended in freeze()
@@ -92,9 +111,22 @@ class GcController:
         def _counts() -> tuple[int, int]:
             return gc.get_freeze_count(), len(gc.get_objects())
 
-        self.frozen_count, self.tracked_count = await self._hass.async_add_executor_job(
-            _counts
-        )
+        async with self._lock:
+            if self._closing:
+                return
+            self.frozen_count, self.tracked_count = await _async_wait(
+                self._hass.async_add_executor_job(_counts)
+            )
+
+    async def async_close(self) -> None:
+        """Reject new work and drain the actual worker before teardown/reload."""
+        self._closing = True
+
+        async def _drain() -> None:
+            async with self._lock:
+                pass
+
+        await _async_wait(asyncio.create_task(_drain()))
 
     def start(self) -> None:
         """Begin timing gen-2 collections via gc.callbacks."""
@@ -163,19 +195,21 @@ class GcController:
         self._log.info("automatic gc resumed")
         return True
 
-    async def async_collect_and_freeze(self, action: str) -> GcResult:
+    async def async_collect_and_freeze(self, action: str) -> GcResult | None:
         """collect() then freeze() — absorb current survivors into the frozen set.
 
         The collect clears genuine garbage first so it is not frozen permanently;
         freeze() then exempts the survivors from future sweeps.
         """
         async with self._lock:
+            if self._closing:
+                return None
             return await self._collect_and_freeze(action)
 
     async def async_refreeze_if_due(self, min_gap: timedelta) -> GcResult | None:
         """Periodic re-freeze, skipped if a freeze happened within ``min_gap``."""
         async with self._lock:
-            if self._too_soon(min_gap, "re-freeze"):
+            if self._closing or self._too_soon(min_gap, "re-freeze"):
                 return None
             return await self._collect_and_freeze("periodic re-freeze")
 
@@ -187,22 +221,26 @@ class GcController:
         accumulating unbounded.
         """
         async with self._lock:
-            if self._too_soon(min_gap, "maintenance"):
+            if self._closing or self._too_soon(min_gap, "maintenance"):
                 return None
             return await self._maintenance()
 
-    async def async_maintenance(self) -> GcResult:
+    async def async_maintenance(self) -> GcResult | None:
         """unfreeze() then collect() then freeze() — the no-leak full reset.
 
         The collect here walks the whole heap, so it is the most expensive
         operation — run it sparingly (daily).
         """
         async with self._lock:
+            if self._closing:
+                return None
             return await self._maintenance()
 
-    async def async_unfreeze(self) -> GcResult:
+    async def async_unfreeze(self) -> GcResult | None:
         """unfreeze() — return all frozen objects to normal collection."""
         async with self._lock:
+            if self._closing:
+                return None
 
             def _do() -> GcResult:
                 before = gc.get_freeze_count()
@@ -217,7 +255,7 @@ class GcController:
                     at=dt_util.utcnow(),
                 )
 
-            return self._record(await self._hass.async_add_executor_job(_do))
+            return await self._async_execute(_do)
 
     def _too_soon(self, min_gap: timedelta, what: str) -> bool:
         if (
@@ -254,10 +292,7 @@ class GcController:
                 at=dt_util.utcnow(),
             )
 
-        result = self._record(await self._hass.async_add_executor_job(_do))
-        self.last_freeze_at = result.at
-        self.peak_pause_ms = None
-        return result
+        return await self._async_execute(_do, freezes=True)
 
     async def _maintenance(self) -> GcResult:
         """unfreeze()+collect()+freeze() body — caller must hold ``self._lock``."""
@@ -281,10 +316,20 @@ class GcController:
                 at=dt_util.utcnow(),
             )
 
-        result = self._record(await self._hass.async_add_executor_job(_do))
-        self.last_freeze_at = result.at
-        self.peak_pause_ms = None
-        return result
+        return await self._async_execute(_do, freezes=True)
+
+    async def _async_execute(
+        self, job: Callable[[], GcResult], *, freezes: bool = False
+    ) -> GcResult:
+        """Retain the worker and lock through cancellation; record its outcome."""
+
+        def _completed(result: GcResult) -> None:
+            self._record(result)
+            if freezes:
+                self.last_freeze_at = result.at
+                self.peak_pause_ms = None
+
+        return await _async_wait(self._hass.async_add_executor_job(job), _completed)
 
     def _record(self, result: GcResult) -> GcResult:
         self.last_result = result
