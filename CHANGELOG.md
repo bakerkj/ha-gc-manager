@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.0.4](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.3...v0.0.4) (2026-10-24)
+
+
+### Miscellaneous Chores
+
+* **deps:** update anthropics/claude-code-action action to v1.0.255 ([#55](https://github.com/bakerkj/ha-gc-manager/issues/55)) ([ecaaaed](https://github.com/bakerkj/ha-gc-manager/commit/ecaaaed96c356ad587e99c02874ba44e2b20dd7f))
+* **deps:** update dependency uv to v0.13.1 ([#48](https://github.com/bakerkj/ha-gc-manager/issues/48)) ([5c23546](https://github.com/bakerkj/ha-gc-manager/commit/5c23546b06cf9cd57691af972d1eee779c96bde5))
+* **deps:** update dependency uv to v0.13.3 ([#51](https://github.com/bakerkj/ha-gc-manager/issues/51)) ([872168d](https://github.com/bakerkj/ha-gc-manager/commit/872168d129772444f77e4063d837ebd94287f954))
+* **deps:** update dependency uv to v0.13.4 ([#54](https://github.com/bakerkj/ha-gc-manager/issues/54)) ([356cb9d](https://github.com/bakerkj/ha-gc-manager/commit/356cb9da8ce00c9b871920ab89be0689fbdea83a))
+* **deps:** update dependency uv to v0.13.5 ([#56](https://github.com/bakerkj/ha-gc-manager/issues/56)) ([4803233](https://github.com/bakerkj/ha-gc-manager/commit/4803233e4b787ef66080a7b281f41ddf5210de6a))
+* **deps:** update github-actions ([#50](https://github.com/bakerkj/ha-gc-manager/issues/50)) ([42795e6](https://github.com/bakerkj/ha-gc-manager/commit/42795e6dd389917f1181b069c2a61ada1fbec031))
+* **deps:** update github-actions ([#52](https://github.com/bakerkj/ha-gc-manager/issues/52)) ([d9b19b8](https://github.com/bakerkj/ha-gc-manager/commit/d9b19b8034d2c90ed47896c1dec170dbf88708fc))
+* **deps:** update github-actions ([#57](https://github.com/bakerkj/ha-gc-manager/issues/57)) ([9af6c03](https://github.com/bakerkj/ha-gc-manager/commit/9af6c03c5c963ea8ca3f7e0540645c7b799ecc19))
+* **deps:** update j178/prek-action action to v3.1.0 ([#53](https://github.com/bakerkj/ha-gc-manager/issues/53)) ([0602c85](https://github.com/bakerkj/ha-gc-manager/commit/0602c854f937400c2be83ee5dfde69e6ea935fdb))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.17.1 ([#49](https://github.com/bakerkj/ha-gc-manager/issues/49)) ([80ac700](https://github.com/bakerkj/ha-gc-manager/commit/80ac700525dda2549d98e7ee432758bfd4e49ed0))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.17.2 ([#58](https://github.com/bakerkj/ha-gc-manager/issues/58)) ([e93a195](https://github.com/bakerkj/ha-gc-manager/commit/e93a195b1edbdc3265340512060639927c04772b))
+
+
+### Continuous Integration
+
+* **claude:** gate on-demand [@claude](https://github.com/claude) workflow to repo owner ([#45](https://github.com/bakerkj/ha-gc-manager/issues/45)) ([2bda50a](https://github.com/bakerkj/ha-gc-manager/commit/2bda50aba3b6066fc79b519618a364e39f48c04f))
+
 ## [0.0.3](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.2...v0.0.3) (2026-10-11)
 
 
