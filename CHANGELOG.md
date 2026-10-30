@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.0.4](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.3...v0.0.4) (2026-10-30)
+
+
+### Bug Fixes
+
+* **deps:** pin the HA test plugin so the locked HA tracks releases ([#61](https://github.com/bakerkj/ha-gc-manager/issues/61)) ([d8de27d](https://github.com/bakerkj/ha-gc-manager/commit/d8de27d31d1755b6efc590c1501930c1e66fce04))
+
+
+### Miscellaneous Chores
+
+* **ci:** standardize uv usage across workflows ([#60](https://github.com/bakerkj/ha-gc-manager/issues/60)) ([d85534c](https://github.com/bakerkj/ha-gc-manager/commit/d85534c8f44326c5ea615c06884162759a78015e))
+* **deps:** lock file maintenance ([#62](https://github.com/bakerkj/ha-gc-manager/issues/62)) ([79dc2a3](https://github.com/bakerkj/ha-gc-manager/commit/79dc2a3f0cb91f31457fe6de48eac33bf75f0682))
+* **deps:** lock file maintenance ([#66](https://github.com/bakerkj/ha-gc-manager/issues/66)) ([686621d](https://github.com/bakerkj/ha-gc-manager/commit/686621d510fd08d8f3bdc7b50882ca05cb875f90))
+* **deps:** lock file maintenance ([#67](https://github.com/bakerkj/ha-gc-manager/issues/67)) ([8e5edc3](https://github.com/bakerkj/ha-gc-manager/commit/8e5edc300ce41d5b9bbe8e5f55f947854ef31ecc))
+* **deps:** lock file maintenance ([#73](https://github.com/bakerkj/ha-gc-manager/issues/73)) ([97ddd0c](https://github.com/bakerkj/ha-gc-manager/commit/97ddd0cd44e508b0799ea3519a304c3c96ef2bef))
+* **deps:** lock file maintenance ([#75](https://github.com/bakerkj/ha-gc-manager/issues/75)) ([3836f53](https://github.com/bakerkj/ha-gc-manager/commit/3836f53e8eea7829111f6c60b915abfccfeb8d45))
+* **deps:** update anthropics/claude-code-action action to v1.0.255 ([#55](https://github.com/bakerkj/ha-gc-manager/issues/55)) ([ecaaaed](https://github.com/bakerkj/ha-gc-manager/commit/ecaaaed96c356ad587e99c02874ba44e2b20dd7f))
+* **deps:** update anthropics/claude-code-action action to v1.0.263 ([#63](https://github.com/bakerkj/ha-gc-manager/issues/63)) ([a56c87a](https://github.com/bakerkj/ha-gc-manager/commit/a56c87aa6946e3cbbd619575893e50cd48a7c7e6))
+* **deps:** update dependency uv to v0.13.1 ([#48](https://github.com/bakerkj/ha-gc-manager/issues/48)) ([5c23546](https://github.com/bakerkj/ha-gc-manager/commit/5c23546b06cf9cd57691af972d1eee779c96bde5))
+* **deps:** update dependency uv to v0.13.3 ([#51](https://github.com/bakerkj/ha-gc-manager/issues/51)) ([872168d](https://github.com/bakerkj/ha-gc-manager/commit/872168d129772444f77e4063d837ebd94287f954))
+* **deps:** update dependency uv to v0.13.4 ([#54](https://github.com/bakerkj/ha-gc-manager/issues/54)) ([356cb9d](https://github.com/bakerkj/ha-gc-manager/commit/356cb9da8ce00c9b871920ab89be0689fbdea83a))
+* **deps:** update dependency uv to v0.13.5 ([#56](https://github.com/bakerkj/ha-gc-manager/issues/56)) ([4803233](https://github.com/bakerkj/ha-gc-manager/commit/4803233e4b787ef66080a7b281f41ddf5210de6a))
+* **deps:** update dependency uv to v0.13.6 ([#64](https://github.com/bakerkj/ha-gc-manager/issues/64)) ([c868668](https://github.com/bakerkj/ha-gc-manager/commit/c86866821082255c14801f660f8b291a0b6b1b10))
+* **deps:** update github-actions ([#50](https://github.com/bakerkj/ha-gc-manager/issues/50)) ([42795e6](https://github.com/bakerkj/ha-gc-manager/commit/42795e6dd389917f1181b069c2a61ada1fbec031))
+* **deps:** update github-actions ([#52](https://github.com/bakerkj/ha-gc-manager/issues/52)) ([d9b19b8](https://github.com/bakerkj/ha-gc-manager/commit/d9b19b8034d2c90ed47896c1dec170dbf88708fc))
+* **deps:** update github-actions ([#57](https://github.com/bakerkj/ha-gc-manager/issues/57)) ([9af6c03](https://github.com/bakerkj/ha-gc-manager/commit/9af6c03c5c963ea8ca3f7e0540645c7b799ecc19))
+* **deps:** update github-actions ([#74](https://github.com/bakerkj/ha-gc-manager/issues/74)) ([d2f0c4a](https://github.com/bakerkj/ha-gc-manager/commit/d2f0c4af373c82bda880fc90ac041b7edfb3cb45))
+* **deps:** update j178/prek-action action to v3.1.0 ([#53](https://github.com/bakerkj/ha-gc-manager/issues/53)) ([0602c85](https://github.com/bakerkj/ha-gc-manager/commit/0602c854f937400c2be83ee5dfde69e6ea935fdb))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.17.1 ([#49](https://github.com/bakerkj/ha-gc-manager/issues/49)) ([80ac700](https://github.com/bakerkj/ha-gc-manager/commit/80ac700525dda2549d98e7ee432758bfd4e49ed0))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.17.2 ([#58](https://github.com/bakerkj/ha-gc-manager/issues/58)) ([e93a195](https://github.com/bakerkj/ha-gc-manager/commit/e93a195b1edbdc3265340512060639927c04772b))
+* **deps:** update pre-commit hooks ([#65](https://github.com/bakerkj/ha-gc-manager/issues/65)) ([ee7d6f0](https://github.com/bakerkj/ha-gc-manager/commit/ee7d6f01fe911435ff03be9a254248c4ff56e842))
+* **renovate:** enable lockFileMaintenance ([#59](https://github.com/bakerkj/ha-gc-manager/issues/59)) ([5ddeea8](https://github.com/bakerkj/ha-gc-manager/commit/5ddeea818e39f4df703131ce5dfe6569a1606ffe))
+
+
+### Continuous Integration
+
+* **claude:** gate on-demand [@claude](https://github.com/claude) workflow to repo owner ([#45](https://github.com/bakerkj/ha-gc-manager/issues/45)) ([2bda50a](https://github.com/bakerkj/ha-gc-manager/commit/2bda50aba3b6066fc79b519618a364e39f48c04f))
+
 ## [0.0.3](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.2...v0.0.3) (2026-10-11)
 
 
