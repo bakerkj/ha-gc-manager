@@ -145,6 +145,17 @@ def _build_schema(source: Mapping[str, Any]) -> vol.Schema:
     )
 
 
+def _errors(user_input: Mapping[str, Any]) -> dict[str, str]:
+    """A freeze with no reset schedule retains frozen-then-dead cycles forever."""
+    if (
+        user_input[CONF_FREEZE_ON_START]
+        and int(user_input[CONF_REFREEZE_INTERVAL_HOURS]) == 0
+        and not user_input[CONF_DAILY_MAINTENANCE]
+    ):
+        return {"base": "no_reset_schedule"}
+    return {}
+
+
 class GcManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -161,6 +172,7 @@ class GcManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
 
+        errors = {}
         if user_input is not None:
             errors = _validate_pause_combo(user_input)
             if not errors:
@@ -171,13 +183,16 @@ class GcManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=_build_schema(user_input), errors=errors
             )
 
-        return self.async_show_form(step_id="user", data_schema=_build_schema({}))
+        return self.async_show_form(
+            step_id="user", data_schema=_build_schema(user_input or {}), errors=errors
+        )
 
 
 class GcManagerOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        errors = {}
         if user_input is not None:
             errors = _validate_pause_combo(user_input)
             if not errors:
@@ -191,12 +206,19 @@ class GcManagerOptionsFlow(config_entries.OptionsFlow):
 
 
 def _validate_pause_combo(user_input: Mapping[str, Any]) -> dict[str, str]:
-    """Enforce the two pause_gc_until_freeze invariants.
+    """Reject option combinations that would silently misbehave.
 
     Without a startup freeze there is no finisher for the pause; with a
     startup delay beyond the watchdog the failsafe preempts the freeze.
     """
     errors: dict[str, str] = {}
+    # A freeze with no reset schedule retains frozen-then-dead cycles forever.
+    if (
+        user_input.get(CONF_FREEZE_ON_START)
+        and int(user_input.get(CONF_REFREEZE_INTERVAL_HOURS, 0)) == 0
+        and not user_input.get(CONF_DAILY_MAINTENANCE)
+    ):
+        errors["base"] = "no_reset_schedule"
     if not user_input.get(CONF_PAUSE_GC_UNTIL_FREEZE):
         return errors
     if not user_input.get(CONF_FREEZE_ON_START):
