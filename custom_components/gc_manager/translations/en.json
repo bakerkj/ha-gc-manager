@@ -21,13 +21,11 @@
     },
     "error": {
       "pause_requires_freeze_on_start": "Pause automatic GC needs the startup freeze; otherwise the pause has no finisher.",
-      "startup_delay_exceeds_pause_watchdog": "Startup delay must be under the pause watchdog when pausing GC; otherwise the failsafe resumes GC before the freeze runs."
+      "startup_delay_exceeds_pause_watchdog": "Startup delay must be under the pause watchdog when pausing GC; otherwise the failsafe resumes GC before the freeze runs.",
+      "no_reset_schedule": "Freezing needs a reset: enable daily maintenance or a periodic re-freeze interval above 0, or turn the startup freeze off."
     },
     "abort": {
       "single_instance_allowed": "GC Manager is already configured."
-    },
-    "error": {
-      "no_reset_schedule": "Freezing needs a reset: enable daily maintenance or a periodic re-freeze interval above 0, or turn the startup freeze off."
     }
   },
   "options": {
