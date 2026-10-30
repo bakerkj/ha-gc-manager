@@ -25,7 +25,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
+
+from .const import FROZEN_GEN2_THRESHOLD
 
 # Only gen-2 (full) collections meaningfully pause the loop; ignore gen-0/1.
 _FULL_GENERATION = 2
@@ -81,6 +84,10 @@ class GcController:
         self._callback: Callable[[str, dict[str, Any]], None] | None = None
         self._orig_thresholds: tuple[int, int, int] | None = None
         self._overrode_thresholds = False
+        # threshold2 as it was before the while-frozen raise; None = not raised.
+        self._gen2_before_freeze: int | None = None
+        self._inflight: asyncio.Future | None = None
+        self._stopped = False
 
     async def async_refresh_counts(self) -> None:
         """Sample the frozen + tracked object counts off the loop.
@@ -89,12 +96,11 @@ class GcController:
         sensors read these cached values instead of calling gc directly.
         """
 
-        def _counts() -> tuple[int, int]:
-            return gc.get_freeze_count(), len(gc.get_objects())
+        def _counts() -> int:
+            self._frozen_now()  # first sample only; the ops keep it current
+            return len(gc.get_objects())
 
-        self.frozen_count, self.tracked_count = await self._hass.async_add_executor_job(
-            _counts
-        )
+        self.tracked_count = await self._hass.async_add_executor_job(_counts)
 
     def start(self) -> None:
         """Begin timing gen-2 collections via gc.callbacks."""
@@ -103,6 +109,7 @@ class GcController:
         gc.callbacks.append(self._callback)
 
     def stop(self) -> None:
+        self._stopped = True  # refuse ops from here on (a late timer task)
         if self._callback is not None and self._callback in gc.callbacks:
             gc.callbacks.remove(self._callback)
         self._callback = None
@@ -118,7 +125,23 @@ class GcController:
         if self._overrode_thresholds and self._orig_thresholds is not None:
             gc.set_threshold(*self._orig_thresholds)
             self._overrode_thresholds = False
+            self._gen2_before_freeze = None  # covered by the full restore
             self._log.info("gc thresholds restored to %s", self._orig_thresholds)
+
+    def _raise_gen2_threshold(self) -> None:
+        """Keep gen-2 rare while frozen (see FROZEN_GEN2_THRESHOLD). Runs right
+        after freeze(), on the executor thread."""
+        gen0, gen1, gen2 = gc.get_threshold()
+        if gen2 < FROZEN_GEN2_THRESHOLD:
+            self._gen2_before_freeze = gen2
+            gc.set_threshold(gen0, gen1, FROZEN_GEN2_THRESHOLD)
+
+    def restore_gen2_threshold(self) -> None:
+        """Undo the while-frozen raise, if it is in effect."""
+        if self._gen2_before_freeze is not None:
+            gen0, gen1, _ = gc.get_threshold()
+            gc.set_threshold(gen0, gen1, self._gen2_before_freeze)
+            self._gen2_before_freeze = None
 
     def _on_gc(self, phase: str, info: dict[str, Any]) -> None:
         # Runs on whichever thread triggered the collection; collections are
@@ -205,19 +228,52 @@ class GcController:
         async with self._lock:
 
             def _do() -> GcResult:
-                before = gc.get_freeze_count()
+                before = self._frozen_now()
                 start = time.perf_counter()
                 gc.unfreeze()
+                self.restore_gen2_threshold()
                 return GcResult(
                     action="unfreeze",
                     collected=0,
                     frozen_before=before,
-                    frozen_after=gc.get_freeze_count(),
+                    frozen_after=self._frozen_after_op(),
                     duration_ms=(time.perf_counter() - start) * 1000.0,
                     at=dt_util.utcnow(),
                 )
 
-            return self._record(await self._hass.async_add_executor_job(_do))
+            return self._record(await self._run_off_loop(_do))
+
+    def _frozen_now(self) -> int:
+        """The frozen count: cached once known, since only our ops change it and
+        gc.get_freeze_count() walks the whole frozen set."""
+        if self.frozen_count is None:
+            self.frozen_count = gc.get_freeze_count()
+        return self.frozen_count
+
+    def _frozen_after_op(self) -> int:
+        self.frozen_count = gc.get_freeze_count()
+        return self.frozen_count
+
+    async def _run_off_loop(self, fn: Callable[[], GcResult]) -> GcResult:
+        """Run a gc op on the executor, holding the lock until the thread is done.
+
+        An executor job can't be cancelled, so a cancelled caller waits for it
+        anyway: otherwise the lock would be released mid-collect and another op
+        (or teardown's unfreeze) could interleave with it.
+        """
+        if self._stopped:
+            raise HomeAssistantError("gc_manager is unloaded; gc operation refused")
+        self._inflight = self._hass.async_add_executor_job(fn)
+        try:
+            return await asyncio.shield(self._inflight)
+        except asyncio.CancelledError:
+            await asyncio.wait([self._inflight])
+            raise
+
+    async def async_drain(self) -> None:
+        """Wait for an in-flight op's thread, so teardown never races it."""
+        if self._inflight is not None:
+            await asyncio.wait([self._inflight])
 
     def _too_soon(self, min_gap: timedelta, what: str) -> bool:
         if (
@@ -237,7 +293,7 @@ class GcController:
         """collect()+freeze() body — caller must hold ``self._lock``."""
 
         def _do() -> GcResult:
-            before = gc.get_freeze_count()
+            before = self._frozen_now()
             start = time.perf_counter()
             self._collecting_tid = threading.get_ident()
             try:
@@ -245,16 +301,17 @@ class GcController:
             finally:
                 self._collecting_tid = None
             gc.freeze()
+            self._raise_gen2_threshold()
             return GcResult(
                 action=action,
                 collected=collected,
                 frozen_before=before,
-                frozen_after=gc.get_freeze_count(),
+                frozen_after=self._frozen_after_op(),
                 duration_ms=(time.perf_counter() - start) * 1000.0,
                 at=dt_util.utcnow(),
             )
 
-        result = self._record(await self._hass.async_add_executor_job(_do))
+        result = self._record(await self._run_off_loop(_do))
         self.last_freeze_at = result.at
         self.peak_pause_ms = None
         return result
@@ -263,7 +320,7 @@ class GcController:
         """unfreeze()+collect()+freeze() body — caller must hold ``self._lock``."""
 
         def _do() -> GcResult:
-            before = gc.get_freeze_count()
+            before = self._frozen_now()
             start = time.perf_counter()
             gc.unfreeze()
             self._collecting_tid = threading.get_ident()
@@ -272,16 +329,17 @@ class GcController:
             finally:
                 self._collecting_tid = None
             gc.freeze()
+            self._raise_gen2_threshold()
             return GcResult(
                 action="daily maintenance (unfreeze+collect+freeze)",
                 collected=collected,
                 frozen_before=before,
-                frozen_after=gc.get_freeze_count(),
+                frozen_after=self._frozen_after_op(),
                 duration_ms=(time.perf_counter() - start) * 1000.0,
                 at=dt_util.utcnow(),
             )
 
-        result = self._record(await self._hass.async_add_executor_job(_do))
+        result = self._record(await self._run_off_loop(_do))
         self.last_freeze_at = result.at
         self.peak_pause_ms = None
         return result
