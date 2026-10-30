@@ -75,12 +75,22 @@ class GcController:
         self.pause_count = 0
         self.pause_total_ms = 0.0
         self._pause_start: float | None = None
+        self._listeners: list[Callable[[], None]] = []
         # Thread of our own in-flight forced collect; the probe skips a collection
         # only on this thread, so an organic one on another thread still records.
         self._collecting_tid: int | None = None
         self._callback: Callable[[str, dict[str, Any]], None] | None = None
         self._orig_thresholds: tuple[int, int, int] | None = None
         self._overrode_thresholds = False
+
+    def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Call ``listener`` whenever a value the sensors show changes."""
+        self._listeners.append(listener)
+        return lambda: self._listeners.remove(listener)
+
+    def _notify(self) -> None:
+        for listener in list(self._listeners):
+            listener()
 
     async def async_refresh_counts(self) -> None:
         """Sample the frozen + tracked object counts off the loop.
@@ -95,6 +105,7 @@ class GcController:
         self.frozen_count, self.tracked_count = await self._hass.async_add_executor_job(
             _counts
         )
+        self._notify()
 
     def start(self) -> None:
         """Begin timing gen-2 collections via gc.callbacks."""
@@ -152,6 +163,7 @@ class GcController:
         gc.disable()
         self._paused_automatic = True
         self._log.info("automatic gc paused until the startup freeze")
+        self._notify()
         return True
 
     def resume_automatic(self) -> bool:
@@ -161,6 +173,7 @@ class GcController:
         self._paused_automatic = False
         gc.enable()
         self._log.info("automatic gc resumed")
+        self._notify()
         return True
 
     async def async_collect_and_freeze(self, action: str) -> GcResult:
@@ -217,7 +230,9 @@ class GcController:
                     at=dt_util.utcnow(),
                 )
 
-            return self._record(await self._hass.async_add_executor_job(_do))
+            result = self._record(await self._hass.async_add_executor_job(_do))
+        self._notify()
+        return result
 
     def _too_soon(self, min_gap: timedelta, what: str) -> bool:
         if (
@@ -257,6 +272,7 @@ class GcController:
         result = self._record(await self._hass.async_add_executor_job(_do))
         self.last_freeze_at = result.at
         self.peak_pause_ms = None
+        self._notify()
         return result
 
     async def _maintenance(self) -> GcResult:
@@ -284,6 +300,7 @@ class GcController:
         result = self._record(await self._hass.async_add_executor_job(_do))
         self.last_freeze_at = result.at
         self.peak_pause_ms = None
+        self._notify()
         return result
 
     def _record(self, result: GcResult) -> GcResult:
