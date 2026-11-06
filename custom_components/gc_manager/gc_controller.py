@@ -20,12 +20,14 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+
+from .const import EVENT_GC_OPERATION
 
 # Only gen-2 (full) collections meaningfully pause the loop; ignore gen-0/1.
 _FULL_GENERATION = 2
@@ -41,6 +43,10 @@ class GcResult:
     frozen_after: int
     duration_ms: float
     at: datetime
+
+    def as_dict(self) -> dict[str, Any]:
+        """JSON-friendly form for the operation event and diagnostics."""
+        return {**asdict(self), "at": self.at.isoformat()}
 
 
 class GcController:
@@ -288,6 +294,7 @@ class GcController:
 
     def _record(self, result: GcResult) -> GcResult:
         self.last_result = result
+        self._hass.bus.async_fire(EVENT_GC_OPERATION, result.as_dict())
         self._log.info(
             "%s: collected=%d, frozen %d->%d, took %.0fms",
             result.action,
