@@ -20,6 +20,7 @@ from custom_components.gc_manager.const import (
     CONF_DAILY_MAINTENANCE,
     CONF_FREEZE_ON_START,
     CONF_REFREEZE_INTERVAL_HOURS,
+    CONF_REFREEZE_PAUSE_MS,
     CONF_SAMPLE_INTERVAL_MINUTES,
     CONF_SET_THRESHOLDS,
     CONF_STARTUP_DELAY_SECONDS,
@@ -499,3 +500,50 @@ async def test_unload_cancels_and_removes(hass):
     assert m_change.return_value.call_count == 4  # all time-changes cancelled
     assert not hass.services.has_service(DOMAIN, SERVICE_FREEZE)
     assert DOMAIN not in hass.data
+
+
+async def _fire_first_refreeze_slot(hass, entry, fake_gc, m_change):
+    action = m_change.call_args_list[0].args[1]  # slots come before the daily job
+    with patch("custom_components.gc_manager.gc_controller.gc", fake_gc):
+        await action(None)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+
+async def test_refreeze_waits_for_a_gen2_pause_at_the_target(hass):
+    """With a pause target set, the slot re-freezes only once an automatic gen-2
+    pause since the last freeze reached it; the unfrozen heap has to hurt first."""
+    entry = _entry(hass, freeze_on_start=False, **{CONF_REFREEZE_PAUSE_MS: 200})
+    fake_gc, m_change, *_ = await _setup(hass, entry)
+    controller = hass.data[DOMAIN][entry.entry_id].controller
+
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.freeze.assert_not_called()  # nothing measured yet
+
+    controller.peak_pause_ms = 199.0
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.freeze.assert_not_called()  # below target
+
+    controller.peak_pause_ms = 200.0
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.freeze.assert_called_once()
+
+
+async def test_refreeze_target_zero_keeps_the_unconditional_schedule(hass):
+    entry = _entry(hass, freeze_on_start=False, **{CONF_REFREEZE_PAUSE_MS: 0})
+    fake_gc, m_change, *_ = await _setup(hass, entry)
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.freeze.assert_called_once()
+
+
+async def test_refreeze_target_does_not_gate_the_maintenance_substitute(hass):
+    """With daily maintenance off the periodic pass is the only full reset, which
+    is about memory rather than pauses, so it keeps running on schedule."""
+    entry = _entry(
+        hass,
+        freeze_on_start=False,
+        **{CONF_DAILY_MAINTENANCE: False, CONF_REFREEZE_PAUSE_MS: 200},
+    )
+    fake_gc, m_change, *_ = await _setup(hass, entry)
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.unfreeze.assert_called_once()
+    fake_gc.freeze.assert_called_once()
