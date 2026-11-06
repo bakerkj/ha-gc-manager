@@ -286,3 +286,26 @@ def test_gen2_pauses_are_counted_and_added_up(hass):
             controller.pause_total_ms >= 0
             and controller.pause_total_ms == pytest.approx(controller.pause_total_ms)
         )
+
+
+async def test_listeners_fire_after_ops_count_refresh_and_pause_toggle(hass):
+    """Entities subscribe so their state is written the moment an op lands,
+    instead of waiting for the next poll."""
+    g = _const_gc()
+    g.get_objects.return_value = []
+    g.isenabled.return_value = True
+    seen = MagicMock()
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        remove = controller.async_add_listener(seen)
+        await controller.async_collect_and_freeze("startup freeze")
+        assert seen.call_count == 1
+        await controller.async_refresh_counts()
+        assert seen.call_count == 2
+        assert controller.pause_automatic()
+        assert seen.call_count == 3
+        assert controller.resume_automatic()
+        assert seen.call_count == 4
+        remove()
+        await controller.async_unfreeze()
+        assert seen.call_count == 4
