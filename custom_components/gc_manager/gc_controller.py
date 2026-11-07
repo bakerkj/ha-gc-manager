@@ -90,7 +90,12 @@ class GcController:
 
     def _notify(self) -> None:
         for listener in list(self._listeners):
-            listener()
+            try:
+                listener()
+            except Exception:  # noqa: BLE001
+                # A sensor that fails to write must not fail the GC operation that
+                # already succeeded, or stop the other sensors from updating.
+                self._log.exception("sensor update listener failed")
 
     async def async_refresh_counts(self) -> None:
         """Sample the frozen + tracked object counts off the loop.
@@ -305,6 +310,9 @@ class GcController:
 
     def _record(self, result: GcResult) -> GcResult:
         self.last_result = result
+        # The op already measured this off the loop, so the pushed sensor state
+        # need not wait for the next scheduled sample.
+        self.frozen_count = result.frozen_after
         self._log.info(
             "%s: collected=%d, frozen %d->%d, took %.0fms",
             result.action,

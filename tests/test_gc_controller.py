@@ -309,3 +309,41 @@ async def test_listeners_fire_after_ops_count_refresh_and_pause_toggle(hass):
         remove()
         await controller.async_unfreeze()
         assert seen.call_count == 4
+
+
+async def test_listeners_fire_after_maintenance_and_unfreeze(hass):
+    g = _const_gc()
+    seen = MagicMock()
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        controller.async_add_listener(seen)
+        await controller.async_maintenance()
+        assert seen.call_count == 1
+        await controller.async_unfreeze()
+        assert seen.call_count == 2
+
+
+async def test_listener_sees_frozen_count_from_the_op_it_follows(hass):
+    """The pushed state must carry the new count, not the last scheduled sample."""
+    g = _fake_gc([5000, 7000, 7000, 0])
+    pushed: list[int | None] = []
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        controller.async_add_listener(lambda: pushed.append(controller.frozen_count))
+        await controller.async_collect_and_freeze("manual freeze")
+        await controller.async_unfreeze()
+    assert pushed == [7000, 0]
+
+
+async def test_failing_listener_does_not_fail_the_op_or_other_listeners(hass):
+    g = _const_gc()
+    bad = MagicMock(side_effect=RuntimeError("boom"))
+    good = MagicMock()
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        controller.async_add_listener(bad)
+        controller.async_add_listener(good)
+        result = await controller.async_collect_and_freeze("manual freeze")
+    assert result.action == "manual freeze"
+    bad.assert_called_once()
+    good.assert_called_once()
