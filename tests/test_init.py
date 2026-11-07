@@ -562,3 +562,34 @@ async def test_refreeze_target_does_not_gate_the_maintenance_substitute(hass):
     await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
     fake_gc.unfreeze.assert_called_once()
     fake_gc.freeze.assert_called_once()
+
+
+async def test_scheduled_ops_wait_for_the_startup_freeze(hass):
+    """A re-freeze or daily slot that fires while the startup freeze is still
+    pending must not run: it would freeze startup-transient objects."""
+    entry = _entry(hass, startup_delay_seconds=120)
+    fake_gc = _fake_gc()
+    hass.set_state(CoreState.starting)
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with (
+        p_gc,
+        p_change as m_change,
+        p_interval,
+        p_cl as m_cl,
+        p_started as m_started,
+        p_fwd,
+    ):
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        refreeze = m_change.call_args_list[0].args[1]
+        daily = m_change.call_args_list[-1].args[1]
+        await refreeze(None)
+        await daily(None)
+        fake_gc.freeze.assert_not_called()
+
+        m_started.call_args.args[1](hass)
+        await next(c for c in m_cl.call_args_list if c.args[1] == 120).args[2](None)
+        assert fake_gc.freeze.call_count == 1  # the startup freeze itself
+
+        await daily(None)
+        assert fake_gc.freeze.call_count == 2
