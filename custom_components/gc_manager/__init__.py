@@ -358,7 +358,7 @@ def _register_services(hass: HomeAssistant, controller: GcController) -> None:
         await controller.async_unfreeze()
 
     async def _maintain(_call: ServiceCall) -> None:
-        await controller.async_maintenance()
+        await controller.async_maintenance("manual maintenance (service)")
 
     hass.services.async_register(DOMAIN, SERVICE_FREEZE, _freeze)
     hass.services.async_register(DOMAIN, SERVICE_UNFREEZE, _unfreeze)
