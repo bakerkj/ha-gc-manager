@@ -320,6 +320,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await data.controller.async_close()
     finally:
         _teardown(hass, entry, data)
+    if entry.disabled_by is not None:
+        # HA sets disabled_by before unloading. A disable is indefinite, unlike a
+        # reload, so don't leave a frozen heap nobody will maintain.
+        await hass.async_add_executor_job(gc.unfreeze)
     return unload_ok
 
 
