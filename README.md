@@ -50,6 +50,20 @@ tracked object counts, the gen-2 pause (last and peak since the last freeze),
 the last operation and how much it reclaimed, and per-generation gc
 counts/thresholds/stats; a binary sensor reports whether automatic gc is on.
 
+Every operation also fires a `gc_manager_operation` event on the bus, after the
+sensors have updated, so an automation can react to a slow freeze without
+polling. Its data is `action`, `collected`, `frozen_before`, `frozen_after`,
+`duration_ms` and `at` (ISO 8601). `action` is one of `startup freeze`,
+`periodic re-freeze`, `manual freeze (service)`, `unfreeze`,
+`daily maintenance (unfreeze+collect+freeze)`,
+`periodic maintenance (unfreeze+collect+freeze)` or
+`manual maintenance (service)`.
+
+The integration's **Download diagnostics** includes the options as stored
+(before any rounding or defaults), the interpreter's gc thresholds and stats,
+and the controller's cached telemetry, which is empty if the integration isn't
+loaded.
+
 ## Caveats
 
 - Each operation holds the GIL while the collection runs, so it briefly pauses

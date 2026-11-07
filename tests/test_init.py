@@ -410,6 +410,21 @@ async def test_maintenance_off_periodic_does_full_maintenance(hass):
         await action(None)
         await hass.async_block_till_done(wait_background_tasks=True)
         fake_gc.unfreeze.assert_called()  # maintenance path, not plain re-freeze
+        last = hass.data[DOMAIN][entry.entry_id].controller.last_result
+        assert last.action == "periodic maintenance (unfreeze+collect+freeze)"
+
+
+async def test_maintain_service_is_labelled_manual(hass):
+    entry = _entry(hass, freeze_on_start=False)
+    fake_gc = _fake_gc()
+    hass.set_state(CoreState.running)
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with p_gc, p_change, p_interval, p_cl, p_started, p_fwd:
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        await hass.services.async_call(DOMAIN, SERVICE_MAINTAIN, blocking=True)
+        last = hass.data[DOMAIN][entry.entry_id].controller.last_result
+        assert last.action == "manual maintenance (service)"
 
 
 async def test_restart_schedules_freeze_via_settle_timer(hass):

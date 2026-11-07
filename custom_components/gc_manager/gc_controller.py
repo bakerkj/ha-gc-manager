@@ -20,12 +20,14 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+
+from .const import EVENT_GC_OPERATION
 
 # Only gen-2 (full) collections meaningfully pause the loop; ignore gen-0/1.
 _FULL_GENERATION = 2
@@ -41,6 +43,10 @@ class GcResult:
     frozen_after: int
     duration_ms: float
     at: datetime
+
+    def as_dict(self) -> dict[str, Any]:
+        """JSON-friendly form for the operation event and diagnostics."""
+        return {**asdict(self), "at": self.at.isoformat()}
 
 
 class GcController:
@@ -207,16 +213,20 @@ class GcController:
         async with self._lock:
             if self._too_soon(min_gap, "maintenance"):
                 return None
-            return await self._maintenance()
+            return await self._maintenance(
+                "periodic maintenance (unfreeze+collect+freeze)"
+            )
 
-    async def async_maintenance(self) -> GcResult:
+    async def async_maintenance(
+        self, action: str = "daily maintenance (unfreeze+collect+freeze)"
+    ) -> GcResult:
         """unfreeze() then collect() then freeze() — the no-leak full reset.
 
         The collect here walks the whole heap, so it is the most expensive
         operation — run it sparingly (daily).
         """
         async with self._lock:
-            return await self._maintenance()
+            return await self._maintenance(action)
 
     async def async_unfreeze(self) -> GcResult:
         """unfreeze() — return all frozen objects to normal collection."""
@@ -236,7 +246,7 @@ class GcController:
                 )
 
             result = self._record(await self._hass.async_add_executor_job(_do))
-        self._notify()
+        self._publish(result)
         return result
 
     def _too_soon(self, min_gap: timedelta, what: str) -> bool:
@@ -277,10 +287,10 @@ class GcController:
         result = self._record(await self._hass.async_add_executor_job(_do))
         self.last_freeze_at = result.at
         self.peak_pause_ms = None
-        self._notify()
+        self._publish(result)
         return result
 
-    async def _maintenance(self) -> GcResult:
+    async def _maintenance(self, action: str) -> GcResult:
         """unfreeze()+collect()+freeze() body — caller must hold ``self._lock``."""
 
         def _do() -> GcResult:
@@ -294,7 +304,7 @@ class GcController:
                 self._collecting_tid = None
             gc.freeze()
             return GcResult(
-                action="daily maintenance (unfreeze+collect+freeze)",
+                action=action,
                 collected=collected,
                 frozen_before=before,
                 frozen_after=gc.get_freeze_count(),
@@ -305,8 +315,17 @@ class GcController:
         result = self._record(await self._hass.async_add_executor_job(_do))
         self.last_freeze_at = result.at
         self.peak_pause_ms = None
-        self._notify()
+        self._publish(result)
         return result
+
+    def _publish(self, result: GcResult) -> None:
+        """Push sensor state, then fire the event.
+
+        In this order so an automation triggered by the event reads the new
+        sensor values and controller state.
+        """
+        self._notify()
+        self._hass.bus.async_fire(EVENT_GC_OPERATION, result.as_dict())
 
     def _record(self, result: GcResult) -> GcResult:
         self.last_result = result

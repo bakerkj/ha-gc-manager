@@ -11,8 +11,11 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_capture_events
 
+from custom_components.gc_manager.const import EVENT_GC_OPERATION
 from custom_components.gc_manager.gc_controller import GcController
 
 _LOG = logging.getLogger("test")
@@ -347,3 +350,59 @@ async def test_failing_listener_does_not_fail_the_op_or_other_listeners(hass):
     assert result.action == "manual freeze"
     bad.assert_called_once()
     good.assert_called_once()
+
+
+async def test_every_operation_fires_an_event_with_its_result(hass):
+    """Automations can react to a slow freeze without polling the sensors."""
+    g = _const_gc()
+    events = async_capture_events(hass, EVENT_GC_OPERATION)
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        result = await controller.async_collect_and_freeze("startup freeze")
+        await controller.async_unfreeze()
+        await controller.async_maintenance()
+    await hass.async_block_till_done()
+    assert [e.data["action"] for e in events] == [
+        "startup freeze",
+        "unfreeze",
+        "daily maintenance (unfreeze+collect+freeze)",
+    ]
+    first = events[0].data
+    assert first["collected"] == 1
+    assert first["frozen_before"] == 5000
+    assert first["frozen_after"] == 5000
+    assert first["duration_ms"] == result.duration_ms
+    assert first["at"] == result.at.isoformat()
+
+
+async def test_event_fires_after_state_is_updated_and_pushed(hass):
+    """A listener must see the op's state and the sensors already pushed."""
+    g = _const_gc()
+    order: list[str] = []
+    at_event: list = []
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        controller.peak_pause_ms = 99.0
+        controller.async_add_listener(lambda: order.append("push"))
+
+        @callback
+        def _on_event(_event) -> None:
+            order.append("event")
+            at_event.append((controller.last_freeze_at, controller.peak_pause_ms))
+
+        hass.bus.async_listen(EVENT_GC_OPERATION, _on_event)
+        result = await controller.async_collect_and_freeze("manual freeze")
+        await hass.async_block_till_done()
+    assert order == ["push", "event"]
+    assert at_event == [(result.at, None)]
+
+
+async def test_periodic_and_manual_maintenance_are_labelled_as_such(hass):
+    g = _const_gc()
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        periodic = await controller.async_maintain_if_due(timedelta(0))
+        manual = await controller.async_maintenance("manual maintenance (service)")
+    assert periodic is not None
+    assert periodic.action == "periodic maintenance (unfreeze+collect+freeze)"
+    assert manual.action == "manual maintenance (service)"
