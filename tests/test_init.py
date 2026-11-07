@@ -3,6 +3,8 @@
 
 """Tests for GC Manager setup: schedule arming, services, unload, teardown."""
 
+import asyncio
+import threading
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -562,3 +564,160 @@ async def test_refreeze_target_does_not_gate_the_maintenance_substitute(hass):
     await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
     fake_gc.unfreeze.assert_called_once()
     fake_gc.freeze.assert_called_once()
+
+
+async def test_cancelled_setup_cleans_up_and_can_retry(hass):
+    entry = _entry(hass, set_thresholds=True)
+    fake_gc = _fake_gc()
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with (
+        p_gc,
+        p_change as change,
+        p_interval as interval,
+        p_cl,
+        p_started as started,
+        p_fwd as forward,
+    ):
+        forward.side_effect = asyncio.CancelledError
+        with pytest.raises(asyncio.CancelledError):
+            await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert fake_gc.callbacks == []
+        assert DOMAIN not in hass.data
+        fake_gc.set_threshold.assert_called_with(2000, 10, 10)
+        assert change.return_value.call_count == 4
+        interval.return_value.assert_called_once()
+        started.assert_not_called()
+        for service in _ALL_SERVICES:
+            assert not hass.services.has_service(DOMAIN, service)
+
+        forward.side_effect = None
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert len(fake_gc.callbacks) == 1
+        for service in _ALL_SERVICES:
+            assert hass.services.has_service(DOMAIN, service)
+        with patch.object(
+            hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+        ):
+            assert await async_unload_entry(hass, entry)
+        assert fake_gc.callbacks == []
+
+
+@pytest.mark.parametrize("origin", ["schedule", "service", "startup"])
+@pytest.mark.parametrize("remove_directly", [False, True])
+async def test_teardown_drains_dispatched_work(hass, origin, remove_directly):
+    entry = _entry(hass, freeze_on_start=origin == "startup")
+    fake_gc = _fake_gc()
+    entered, release = threading.Event(), threading.Event()
+
+    def _collect():
+        entered.set()
+        assert release.wait(5)
+        return 1
+
+    fake_gc.collect.side_effect = _collect
+    hass.set_state(CoreState.starting)
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with (
+        p_gc,
+        p_change as change,
+        p_interval,
+        p_cl as later,
+        p_started as started,
+        p_fwd,
+        patch("custom_components.gc_manager.gc", fake_gc),
+        patch.object(
+            hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        controller = hass.data[DOMAIN][entry.entry_id].controller
+        stale_schedule = change.call_args_list[0].args[1]
+        if origin == "schedule":
+            operation = stale_schedule(None)
+        elif origin == "service":
+            operation = hass.services.async_call(DOMAIN, SERVICE_FREEZE, blocking=True)
+        else:
+            started.call_args.args[1](hass)
+            operation = later.call_args.args[2](None)
+        task = asyncio.create_task(operation)
+        teardown = None
+        try:
+            assert await hass.async_add_executor_job(entered.wait, 2)
+            teardown = asyncio.create_task(
+                async_remove_entry(hass, entry)
+                if remove_directly
+                else async_unload_entry(hass, entry)
+            )
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            assert controller._closing
+            assert not teardown.done()
+            assert DOMAIN in hass.data  # retained until the old worker drains
+        finally:
+            release.set()
+            await task
+            if teardown is not None:
+                await teardown
+        if not remove_directly:
+            fake_gc.unfreeze.assert_not_called()  # reload continuity is deliberate
+            await async_remove_entry(hass, entry)
+        names = [call[0] for call in fake_gc.method_calls]
+        assert names.index("freeze") < names.index("unfreeze")
+        assert DOMAIN not in hass.data
+        fake_gc.reset_mock()
+        # Already dispatched callbacks/service handlers cannot restart a closed controller.
+        await stale_schedule(None)
+        await controller.async_collect_and_freeze("late startup/service")
+        await controller.async_maintenance()
+        await controller.async_unfreeze()
+        await controller.async_refresh_counts()
+        fake_gc.freeze.assert_not_called()
+        fake_gc.collect.assert_not_called()
+        fake_gc.get_objects.assert_not_called()
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert hass.data[DOMAIN][entry.entry_id].controller is not controller
+        assert await async_unload_entry(hass, entry)
+
+
+async def test_replacement_setup_waits_for_previous_controller(hass):
+    entry = _entry(hass, freeze_on_start=False)
+    fake_gc = _fake_gc()
+    entered, release = threading.Event(), threading.Event()
+
+    def _collect():
+        entered.set()
+        assert release.wait(5)
+        return 1
+
+    fake_gc.collect.side_effect = _collect
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with p_gc, p_change, p_interval, p_cl, p_started, p_fwd:
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        previous = hass.data[DOMAIN][entry.entry_id].controller
+        task = asyncio.create_task(previous.async_collect_and_freeze("old controller"))
+        replacement = None
+        try:
+            assert await hass.async_add_executor_job(entered.wait, 2)
+            replacement = asyncio.create_task(async_setup_entry(hass, entry))
+            await asyncio.sleep(0)
+            assert not replacement.done()
+            assert hass.data[DOMAIN][entry.entry_id].controller is previous
+            assert len(fake_gc.callbacks) == 1
+        finally:
+            release.set()
+            await task
+            if replacement is not None:
+                assert await replacement
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert hass.data[DOMAIN][entry.entry_id].controller is not previous
+        assert len(fake_gc.callbacks) == 1
+        assert await previous.async_collect_and_freeze("late") is None
+        with patch.object(
+            hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+        ):
+            assert await async_unload_entry(hass, entry)

@@ -99,6 +99,10 @@ def _parse_hms(value: str) -> tuple[int, int, int]:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GC Manager and arm its schedules."""
+    previous = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if previous is not None:
+        await previous.controller.async_close()
+        _teardown(hass, entry, previous)
     source = {**entry.data, **entry.options}
     controller = GcController(hass, _LOGGER)
     data = GcManagerData(controller=controller)
@@ -113,12 +117,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # an immediate freeze, and _teardown cannot recall an already-dispatched
         # one — so a failing forward_entry_setups must happen first.
         _arm_startup_freeze(hass, entry, data, source)
-    except Exception:
+    except BaseException:
         # A failed setup is not followed by async_unload_entry, so undo the
         # global gc state (callback + thresholds) and timers ourselves; otherwise
         # a transient platform error would leak a dangling probe and overridden
         # thresholds, and each reload would stack another callback.
-        _teardown(hass, entry, data)
+        try:
+            await controller.async_close()
+        finally:
+            _teardown(hass, entry, data)
         raise
 
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
@@ -308,7 +315,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     data: GcManagerData = hass.data[DOMAIN][entry.entry_id]
-    _teardown(hass, entry, data)
+    try:
+        await data.controller.async_close()
+    finally:
+        _teardown(hass, entry, data)
     return unload_ok
 
 
@@ -318,6 +328,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     Unload (incl. reload) deliberately leaves the heap frozen for continuity;
     only true removal reverts it, off the loop.
     """
+    data = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if data is not None:
+        try:
+            await data.controller.async_close()
+        finally:
+            _teardown(hass, entry, data)
     await hass.async_add_executor_job(gc.unfreeze)
 
 
