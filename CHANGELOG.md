@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.5](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.4...v0.0.5) (2026-11-13)
+
+
+### Miscellaneous Chores
+
+* **deps:** lock file maintenance ([#92](https://github.com/bakerkj/ha-gc-manager/issues/92)) ([5ccf570](https://github.com/bakerkj/ha-gc-manager/commit/5ccf570b54442401d51339795fc51ba8eb0122f9))
+* **deps:** lock file maintenance ([#95](https://github.com/bakerkj/ha-gc-manager/issues/95)) ([cbf5cbc](https://github.com/bakerkj/ha-gc-manager/commit/cbf5cbc0ea57c18709d58253e7571f8ec605a96a))
+* **deps:** update anthropics/claude-code-action action to v1.0.271 ([#89](https://github.com/bakerkj/ha-gc-manager/issues/89)) ([2b1a22c](https://github.com/bakerkj/ha-gc-manager/commit/2b1a22c2ce2543fdbfbd6ef46173f3d8d222aff3))
+* **deps:** update dependency uv to v0.13.8 ([#94](https://github.com/bakerkj/ha-gc-manager/issues/94)) ([b119a63](https://github.com/bakerkj/ha-gc-manager/commit/b119a63a612e47027b22b0fb2f44dadecb0dd212))
+* **deps:** update pre-commit hook kjanat/actionlint to v1.17.1 ([#90](https://github.com/bakerkj/ha-gc-manager/issues/90)) ([9d79622](https://github.com/bakerkj/ha-gc-manager/commit/9d796221f9a0fdf2d2c75f2d6f06b74adaf97055))
+* **deps:** update pre-commit hooks ([#93](https://github.com/bakerkj/ha-gc-manager/issues/93)) ([c52f419](https://github.com/bakerkj/ha-gc-manager/commit/c52f419d1a99d118247892ebf4db4e36d0787685))
+
 ## [0.0.4](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.3...v0.0.4) (2026-11-07)
 
 
