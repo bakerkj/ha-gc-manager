@@ -76,6 +76,7 @@ _SERVICES = (SERVICE_FREEZE, SERVICE_UNFREEZE, SERVICE_MAINTAIN)
 @dataclass
 class GcManagerData:
     controller: GcController
+    startup_ready: bool = False
     unsubs: list[Callable[[], None]] = field(default_factory=list)
 
 
@@ -101,7 +102,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GC Manager and arm its schedules."""
     source = {**entry.data, **entry.options}
     controller = GcController(hass, _LOGGER)
-    data = GcManagerData(controller=controller)
+    data = GcManagerData(
+        controller=controller,
+        # Without a startup freeze, scheduled operations have no barrier to wait for.
+        startup_ready=not source.get(CONF_FREEZE_ON_START, DEFAULT_FREEZE_ON_START),
+    )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = data
     controller.start()  # begin the gen-2 pause probe; captures original thresholds
 
@@ -145,6 +150,7 @@ def _arm_startup_freeze(
             await controller.async_collect_and_freeze("startup freeze")
         finally:
             controller.resume_automatic()
+            data.startup_ready = True
 
     # Only on a real start: on an install or reload the freeze is immediate and
     # there is no startup to get through.
@@ -264,6 +270,8 @@ def _arm_entry(
         )
 
         async def _refreeze(_now) -> None:
+            if not data.startup_ready:
+                return
             if pause_target and (controller.peak_pause_ms or 0.0) < pause_target:
                 _LOGGER.debug(
                     "re-freeze skipped: peak gen-2 pause %s ms < target %.0f ms",
@@ -292,7 +300,8 @@ def _arm_entry(
         hour, minute, second = base_hms
 
         async def _daily(_now) -> None:
-            await controller.async_maintenance()
+            if data.startup_ready:
+                await controller.async_maintenance()
 
         data.unsubs.append(
             async_track_time_change(
