@@ -7,6 +7,7 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryDisabler
 from homeassistant.core import CoreState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -562,3 +563,39 @@ async def test_refreeze_target_does_not_gate_the_maintenance_substitute(hass):
     await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
     fake_gc.unfreeze.assert_called_once()
     fake_gc.freeze.assert_called_once()
+
+
+async def test_unload_on_disable_unfreezes(hass):
+    """Disabling the entry is indefinite (unlike a reload), so the heap is thawed
+    rather than left frozen with no maintenance to reclaim it."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_FREEZE_ON_START: True},
+        entry_id="gcm",
+        disabled_by=ConfigEntryDisabler.USER,
+    )
+    entry.add_to_hass(hass)
+    await _setup(hass, entry)
+    fake_gc = MagicMock()
+    with (
+        patch("custom_components.gc_manager.gc", fake_gc),
+        patch.object(
+            hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+        ),
+    ):
+        assert await async_unload_entry(hass, entry)
+    fake_gc.unfreeze.assert_called_once()
+
+
+async def test_unload_for_reload_keeps_the_heap_frozen(hass):
+    entry = _entry(hass)
+    await _setup(hass, entry)
+    fake_gc = MagicMock()
+    with (
+        patch("custom_components.gc_manager.gc", fake_gc),
+        patch.object(
+            hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+        ),
+    ):
+        assert await async_unload_entry(hass, entry)
+    fake_gc.unfreeze.assert_not_called()
