@@ -324,14 +324,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # HA sets disabled_by before unloading. A disable is indefinite, unlike a
         # reload, so don't leave a frozen heap nobody will maintain.
         await hass.async_add_executor_job(gc.unfreeze)
+        _LOGGER.info("entry disabled; heap unfrozen")
     return unload_ok
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """On uninstall, restore default gc state by undoing any freeze we applied.
 
-    Unload (incl. reload) deliberately leaves the heap frozen for continuity;
-    only true removal reverts it, off the loop.
+    A reload leaves the heap frozen for continuity; disable and removal revert it.
     """
     data = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if data is not None:

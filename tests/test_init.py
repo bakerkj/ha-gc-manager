@@ -9,7 +9,7 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.config_entries import ConfigEntryDisabler
+from homeassistant.config_entries import ConfigEntryDisabler, ConfigEntryState
 from homeassistant.core import CoreState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -759,3 +759,29 @@ async def test_unload_for_reload_keeps_the_heap_frozen(hass):
     ):
         assert await async_unload_entry(hass, entry)
     fake_gc.unfreeze.assert_not_called()
+
+
+async def test_disable_through_ha_unfreezes_but_reload_does_not(hass):
+    entry = _entry(hass, freeze_on_start=False)
+    fake_gc = _fake_gc()
+    p_gc, p_change, p_interval, p_cl, p_started, _ = _patches(fake_gc, hass)
+    with (
+        p_gc,
+        p_change,
+        p_interval,
+        p_cl,
+        p_started,
+        patch("custom_components.gc_manager.gc", fake_gc),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        fake_gc.unfreeze.assert_not_called()
+
+        await hass.config_entries.async_set_disabled_by(
+            entry.entry_id, ConfigEntryDisabler.USER
+        )
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert entry.state is ConfigEntryState.NOT_LOADED
+    fake_gc.unfreeze.assert_called_once()
