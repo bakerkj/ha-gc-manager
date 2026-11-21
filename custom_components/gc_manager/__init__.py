@@ -198,12 +198,12 @@ def _arm_entry(
             int(source.get(CONF_THRESHOLD_GEN2, DEFAULT_THRESHOLD_GEN2)),
         )
 
-    # ── off-loop sampling of the frozen + tracked object counts ────────────
-    # Off the loop is not free: both walks hold the GIL for their whole length
-    # (~0.3 s for gc.get_freeze_count() with ~3.5 M frozen objects on Python
-    # 3.14), so the event loop stalls while they run all the same. The counts
-    # feed only the two count sensors, so while both are disabled there is
-    # nothing to sample for.
+    # ── off-loop sampling of the tracked object count ──────────────────────
+    # Off the loop is not free: the walk holds the GIL for its whole length, so
+    # the event loop stalls while it runs all the same. It feeds only the
+    # tracked-objects sensor, so once the frozen count has its first sample and
+    # that sensor is disabled there is nothing to sample for (each freeze or
+    # unfreeze op keeps the frozen count current).
     @callback
     def _counts_wanted() -> bool:
         registry = er.async_get(hass)
@@ -219,7 +219,7 @@ def _arm_entry(
         return False
 
     async def _sample_counts(_now=None) -> None:
-        if not _counts_wanted():
+        if controller.frozen_count is not None and not _counts_wanted():
             return
         await controller.async_refresh_counts()
 

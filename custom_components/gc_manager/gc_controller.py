@@ -110,12 +110,11 @@ class GcController:
         sensors read these cached values instead of calling gc directly.
         """
 
-        def _counts() -> tuple[int, int]:
-            return gc.get_freeze_count(), len(gc.get_objects())
+        def _counts() -> int:
+            self._frozen_now()  # first sample only; the ops keep it current
+            return len(gc.get_objects())
 
-        self.frozen_count, self.tracked_count = await self._hass.async_add_executor_job(
-            _counts
-        )
+        self.tracked_count = await self._hass.async_add_executor_job(_counts)
         self._notify()
 
     def start(self) -> None:
@@ -233,14 +232,14 @@ class GcController:
         async with self._lock:
 
             def _do() -> GcResult:
-                before = gc.get_freeze_count()
+                before = self._frozen_now()
                 start = time.perf_counter()
                 gc.unfreeze()
                 return GcResult(
                     action="unfreeze",
                     collected=0,
                     frozen_before=before,
-                    frozen_after=gc.get_freeze_count(),
+                    frozen_after=self._frozen_after_op(),
                     duration_ms=(time.perf_counter() - start) * 1000.0,
                     at=dt_util.utcnow(),
                 )
@@ -248,6 +247,17 @@ class GcController:
             result = self._record(await self._hass.async_add_executor_job(_do))
         self._publish(result)
         return result
+
+    def _frozen_now(self) -> int:
+        """The frozen count, cached once known: only our own ops change it, and
+        gc.get_freeze_count() walks the whole frozen set."""
+        if self.frozen_count is None:
+            self.frozen_count = gc.get_freeze_count()
+        return self.frozen_count
+
+    def _frozen_after_op(self) -> int:
+        self.frozen_count = gc.get_freeze_count()
+        return self.frozen_count
 
     def _too_soon(self, min_gap: timedelta, what: str) -> bool:
         if (
@@ -267,7 +277,7 @@ class GcController:
         """collect()+freeze() body — caller must hold ``self._lock``."""
 
         def _do() -> GcResult:
-            before = gc.get_freeze_count()
+            before = self._frozen_now()
             start = time.perf_counter()
             self._collecting_tid = threading.get_ident()
             try:
@@ -279,7 +289,7 @@ class GcController:
                 action=action,
                 collected=collected,
                 frozen_before=before,
-                frozen_after=gc.get_freeze_count(),
+                frozen_after=self._frozen_after_op(),
                 duration_ms=(time.perf_counter() - start) * 1000.0,
                 at=dt_util.utcnow(),
             )
@@ -294,7 +304,7 @@ class GcController:
         """unfreeze()+collect()+freeze() body — caller must hold ``self._lock``."""
 
         def _do() -> GcResult:
-            before = gc.get_freeze_count()
+            before = self._frozen_now()
             start = time.perf_counter()
             gc.unfreeze()
             self._collecting_tid = threading.get_ident()
@@ -307,7 +317,7 @@ class GcController:
                 action=action,
                 collected=collected,
                 frozen_before=before,
-                frozen_after=gc.get_freeze_count(),
+                frozen_after=self._frozen_after_op(),
                 duration_ms=(time.perf_counter() - start) * 1000.0,
                 at=dt_util.utcnow(),
             )
@@ -329,9 +339,6 @@ class GcController:
 
     def _record(self, result: GcResult) -> GcResult:
         self.last_result = result
-        # The op already measured this off the loop, so the pushed sensor state
-        # need not wait for the next scheduled sample.
-        self.frozen_count = result.frozen_after
         self._log.info(
             "%s: collected=%d, frozen %d->%d, took %.0fms",
             result.action,

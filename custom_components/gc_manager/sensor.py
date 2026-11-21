@@ -60,13 +60,15 @@ _SINGLETON: tuple[GcSensorDescription, ...] = (
         icon="mdi:snowflake",
         native_unit_of_measurement=_OBJECTS,
         state_class=SensorStateClass.MEASUREMENT,
-        # Cached off-loop sample — gc.get_freeze_count() walks the permanent set.
+        # Cached — gc.get_freeze_count() walks the permanent set.
         value_fn=lambda c: c.frozen_count,
     ),
     GcSensorDescription(
         key="tracked_objects",
         name="Tracked objects",
         icon="mdi:counter",
+        # Sampling it builds a list of every unfrozen tracked object: opt in.
+        entity_registry_enabled_default=False,
         native_unit_of_measurement=_OBJECTS,
         state_class=SensorStateClass.MEASUREMENT,
         # Cached off-loop sample — the tracked-set walk is O(heap).

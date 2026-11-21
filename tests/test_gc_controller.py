@@ -328,7 +328,7 @@ async def test_listeners_fire_after_maintenance_and_unfreeze(hass):
 
 async def test_listener_sees_frozen_count_from_the_op_it_follows(hass):
     """The pushed state must carry the new count, not the last scheduled sample."""
-    g = _fake_gc([5000, 7000, 7000, 0])
+    g = _fake_gc([5000, 7000, 0])
     pushed: list[int | None] = []
     with patch("custom_components.gc_manager.gc_controller.gc", g):
         controller = GcController(hass, _LOG)
@@ -406,3 +406,17 @@ async def test_periodic_and_manual_maintenance_are_labelled_as_such(hass):
     assert periodic is not None
     assert periodic.action == "periodic maintenance (unfreeze+collect+freeze)"
     assert manual.action == "manual maintenance (service)"
+
+
+async def test_frozen_count_is_cached_between_ops(hass):
+    """Only our own ops change the frozen set, so each op walks it once (after),
+    not twice, and a later op reuses the cached value as its "before"."""
+    g = _fake_gc([100, 5000, 0])  # first sample, after freeze, after unfreeze
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        first = await controller.async_collect_and_freeze("a")
+        second = await controller.async_unfreeze()
+
+    assert (first.frozen_before, first.frozen_after) == (100, 5000)
+    assert (second.frozen_before, second.frozen_after) == (5000, 0)
+    assert g.get_freeze_count.call_count == 3

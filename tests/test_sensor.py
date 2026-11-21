@@ -154,3 +154,11 @@ async def test_sensor_state_is_pushed_when_an_op_lands(hass):
             await sensor.async_remove()
             await controller.async_unfreeze()
             write.assert_called_once()  # unsubscribed on removal
+
+
+def test_tracked_objects_sensor_is_opt_in():
+    from custom_components.gc_manager.sensor import DESCRIPTIONS
+
+    by_key = {d.key: d for d in DESCRIPTIONS}
+    assert by_key["tracked_objects"].entity_registry_enabled_default is False
+    assert by_key["frozen_objects"].entity_registry_enabled_default is True
