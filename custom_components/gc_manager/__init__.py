@@ -99,6 +99,7 @@ def _parse_hms(value: str) -> tuple[int, int, int]:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GC Manager and arm its schedules."""
+    # Defensive: HA only sets up NOT_LOADED entries, so this shouldn't trigger.
     previous = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if previous is not None:
         await previous.controller.async_close()

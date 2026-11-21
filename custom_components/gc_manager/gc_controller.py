@@ -36,7 +36,11 @@ _FULL_GENERATION = 2
 async def _async_wait[T](
     worker: asyncio.Future[T], completed: Callable[[T], None] | None = None
 ) -> T:
-    """Delay cancellation until executor work (and its bookkeeping) finishes."""
+    """Delay cancellation until executor work (and its bookkeeping) finishes.
+
+    Re-raises the latest cancellation. At shutdown HA cancels the worker future
+    itself, ending the wait early; harmless, as no teardown follows.
+    """
     cancelled = None
     while not worker.done():
         try:

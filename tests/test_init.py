@@ -676,6 +676,7 @@ async def test_teardown_drains_dispatched_work(hass, origin, remove_directly):
         await controller.async_refresh_counts()
         fake_gc.freeze.assert_not_called()
         fake_gc.collect.assert_not_called()
+        fake_gc.unfreeze.assert_not_called()
         fake_gc.get_objects.assert_not_called()
         assert await async_setup_entry(hass, entry)
         await hass.async_block_till_done(wait_background_tasks=True)
