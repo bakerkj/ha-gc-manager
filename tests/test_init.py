@@ -785,3 +785,63 @@ async def test_disable_through_ha_unfreezes_but_reload_does_not(hass):
         await hass.async_block_till_done(wait_background_tasks=True)
     assert entry.state is ConfigEntryState.NOT_LOADED
     fake_gc.unfreeze.assert_called_once()
+
+
+async def test_scheduled_ops_wait_for_the_startup_freeze(hass):
+    """A re-freeze or daily slot that fires while the startup freeze is still
+    pending must not run: it would freeze startup-transient objects."""
+    entry = _entry(hass, startup_delay_seconds=120)
+    fake_gc = _fake_gc()
+    hass.set_state(CoreState.starting)
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with (
+        p_gc,
+        p_change as m_change,
+        p_interval,
+        p_cl as m_cl,
+        p_started as m_started,
+        p_fwd,
+    ):
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        refreeze = m_change.call_args_list[0].args[1]
+        daily = m_change.call_args_list[-1].args[1]
+        await refreeze(None)
+        await daily(None)
+        fake_gc.freeze.assert_not_called()
+
+        m_started.call_args.args[1](hass)
+        await next(c for c in m_cl.call_args_list if c.args[1] == 120).args[2](None)
+        assert fake_gc.freeze.call_count == 1  # the startup freeze itself
+
+        await daily(None)
+        assert fake_gc.freeze.call_count == 2
+
+
+async def test_reload_startup_freeze_opens_the_gate(hass):
+    """Already running (install/reload): the immediate startup freeze opens it."""
+    entry = _entry(hass)
+    fake_gc, m_change, *_ = await _setup(hass, entry)
+    assert hass.data[DOMAIN][entry.entry_id].startup_ready
+    assert fake_gc.freeze.call_count == 1
+    daily = m_change.call_args_list[-1].args[1]
+    with patch("custom_components.gc_manager.gc_controller.gc", fake_gc):
+        await daily(None)
+    assert fake_gc.freeze.call_count == 2
+
+
+async def test_maintenance_substitute_waits_for_the_startup_freeze(hass):
+    """With daily off, the periodic maintenance slot is gated too."""
+    entry = _entry(hass, **{CONF_DAILY_MAINTENANCE: False}, startup_delay_seconds=120)
+    fake_gc, m_change, m_cl, _ = await _setup(hass, entry, running=False)
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.unfreeze.assert_not_called()
+    fake_gc.freeze.assert_not_called()
+
+    startup = next(c for c in m_cl.call_args_list if c.args[1] == 120).args[2]
+    with patch("custom_components.gc_manager.gc_controller.gc", fake_gc):
+        await startup(None)
+    controller = hass.data[DOMAIN][entry.entry_id].controller
+    controller.last_freeze_at -= timedelta(hours=4)  # past the debounce
+    await _fire_first_refreeze_slot(hass, entry, fake_gc, m_change)
+    fake_gc.unfreeze.assert_called_once()
