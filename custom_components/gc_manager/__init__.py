@@ -279,6 +279,7 @@ def _arm_entry(
 
         async def _refreeze(_now) -> None:
             if not data.startup_ready:
+                _LOGGER.debug("re-freeze skipped: startup freeze pending")
                 return
             if pause_target and (controller.peak_pause_ms or 0.0) < pause_target:
                 _LOGGER.debug(
@@ -308,8 +309,10 @@ def _arm_entry(
         hour, minute, second = base_hms
 
         async def _daily(_now) -> None:
-            if data.startup_ready:
-                await controller.async_maintenance()
+            if not data.startup_ready:
+                _LOGGER.debug("daily maintenance skipped: startup freeze pending")
+                return
+            await controller.async_maintenance()
 
         data.unsubs.append(
             async_track_time_change(
