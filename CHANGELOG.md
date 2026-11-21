@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.0.5](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.4...v0.0.5) (2026-11-21)
+
+
+### Bug Fixes
+
+* drain in-flight GC work on unload, reload and failed setup ([#102](https://github.com/bakerkj/ha-gc-manager/issues/102)) ([084e3a8](https://github.com/bakerkj/ha-gc-manager/commit/084e3a854be1c87e9ef4925702413fb5c604dab8))
+* hold scheduled operations until the startup freeze has run ([#104](https://github.com/bakerkj/ha-gc-manager/issues/104)) ([939145f](https://github.com/bakerkj/ha-gc-manager/commit/939145ffe0d072a4d68bac0d3eb4450c222d3abf))
+* unfreeze the heap when the integration is disabled ([#103](https://github.com/bakerkj/ha-gc-manager/issues/103)) ([8631023](https://github.com/bakerkj/ha-gc-manager/commit/8631023ef6a3b0defc9de0818689334bf324ab92))
+
+
+### Miscellaneous Chores
+
+* **deps:** lock file maintenance ([#92](https://github.com/bakerkj/ha-gc-manager/issues/92)) ([5ccf570](https://github.com/bakerkj/ha-gc-manager/commit/5ccf570b54442401d51339795fc51ba8eb0122f9))
+* **deps:** lock file maintenance ([#95](https://github.com/bakerkj/ha-gc-manager/issues/95)) ([cbf5cbc](https://github.com/bakerkj/ha-gc-manager/commit/cbf5cbc0ea57c18709d58253e7571f8ec605a96a))
+* **deps:** lock file maintenance ([#97](https://github.com/bakerkj/ha-gc-manager/issues/97)) ([229c4e5](https://github.com/bakerkj/ha-gc-manager/commit/229c4e506a07aeefa7dae1f954b2502f7db67953))
+* **deps:** update anthropics/claude-code-action action to v1.0.271 ([#89](https://github.com/bakerkj/ha-gc-manager/issues/89)) ([2b1a22c](https://github.com/bakerkj/ha-gc-manager/commit/2b1a22c2ce2543fdbfbd6ef46173f3d8d222aff3))
+* **deps:** update anthropics/claude-code-action action to v1.0.280 ([#100](https://github.com/bakerkj/ha-gc-manager/issues/100)) ([d9794a0](https://github.com/bakerkj/ha-gc-manager/commit/d9794a079dca131522ae01c91d6c0ae11fa4ce3d))
+* **deps:** update dependency uv to v0.13.8 ([#94](https://github.com/bakerkj/ha-gc-manager/issues/94)) ([b119a63](https://github.com/bakerkj/ha-gc-manager/commit/b119a63a612e47027b22b0fb2f44dadecb0dd212))
+* **deps:** update dependency uv to v0.13.9 ([#98](https://github.com/bakerkj/ha-gc-manager/issues/98)) ([1c18c82](https://github.com/bakerkj/ha-gc-manager/commit/1c18c82c3d1fb5ca39de09fbe6e4606a0581ad2b))
+* **deps:** update github-actions ([#101](https://github.com/bakerkj/ha-gc-manager/issues/101)) ([7c18c70](https://github.com/bakerkj/ha-gc-manager/commit/7c18c70cdc22a6e49a5a017c0ee6efb2e48d2e2c))
+* **deps:** update github-actions ([#96](https://github.com/bakerkj/ha-gc-manager/issues/96)) ([22ece41](https://github.com/bakerkj/ha-gc-manager/commit/22ece41cff5616fc9104f151bdcc930036aaf5ad))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.17.6 ([#99](https://github.com/bakerkj/ha-gc-manager/issues/99)) ([6efe48e](https://github.com/bakerkj/ha-gc-manager/commit/6efe48e69f6e554bdb04e5b99f9293049655ed4c))
+* **deps:** update pre-commit hook kjanat/actionlint to v1.17.1 ([#90](https://github.com/bakerkj/ha-gc-manager/issues/90)) ([9d79622](https://github.com/bakerkj/ha-gc-manager/commit/9d796221f9a0fdf2d2c75f2d6f06b74adaf97055))
+* **deps:** update pre-commit hooks ([#93](https://github.com/bakerkj/ha-gc-manager/issues/93)) ([c52f419](https://github.com/bakerkj/ha-gc-manager/commit/c52f419d1a99d118247892ebf4db4e36d0787685))
+
 ## [0.0.4](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.3...v0.0.4) (2026-11-07)
 
 
