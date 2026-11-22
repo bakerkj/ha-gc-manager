@@ -357,7 +357,7 @@ async def test_count_sampler_honors_configured_interval(hass):
 async def test_count_sampler_skips_while_both_count_sensors_are_disabled(hass):
     """The frozen/tracked walks hold the GIL for their whole length, so with
     both count sensors disabled there is nothing to sample for: no walk runs.
-    Re-enabling either one brings the sampling back on the next tick."""
+    Re-enabling one walks only that set on the next tick."""
     from homeassistant.helpers import entity_registry as er
 
     entry = _entry(hass, freeze_on_start=False)
@@ -380,13 +380,41 @@ async def test_count_sampler_skips_while_both_count_sensors_are_disabled(hass):
         fake_gc.get_freeze_count.assert_not_called()
         fake_gc.get_objects.assert_not_called()
         assert controller.frozen_count is None
-        # enable one: the next scheduled tick samples again
+        # enable tracked only: the next tick walks only the tracked set
         eid = reg.async_get_entity_id(
             "sensor", DOMAIN, f"{entry.entry_id}_tracked_objects"
         )
         reg.async_update_entity(eid, disabled_by=None)
         await m_interval.call_args.args[1]()
-        fake_gc.get_freeze_count.assert_called_once()
+        fake_gc.get_objects.assert_called_once()
+        fake_gc.get_freeze_count.assert_not_called()
+        assert controller.tracked_count == 0
+        assert controller.frozen_count is None
+
+
+async def test_count_sampler_walks_only_the_enabled_sensor(hass):
+    """Frozen on, tracked off: only the frozen set is walked."""
+    from homeassistant.helpers import entity_registry as er
+
+    entry = _entry(hass, freeze_on_start=False)
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.entry_id}_tracked_objects",
+        config_entry=entry,
+        disabled_by=er.RegistryEntryDisabler.USER,
+    )
+    fake_gc = _fake_gc()
+    hass.set_state(CoreState.running)
+    p_gc, p_change, p_interval, p_cl, p_started, p_fwd = _patches(fake_gc, hass)
+    with p_gc, p_change, p_interval, p_cl, p_started, p_fwd:
+        assert await async_setup_entry(hass, entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        controller = hass.data[DOMAIN][entry.entry_id].controller
+    fake_gc.get_freeze_count.assert_called_once()
+    fake_gc.get_objects.assert_not_called()
+    assert controller.frozen_count == 5000
+    assert controller.tracked_count is None
 
 
 async def test_install_reload_freezes_immediately_no_delay(hass):
