@@ -40,7 +40,6 @@ from .const import (
     CONF_THRESHOLD_GEN0,
     CONF_THRESHOLD_GEN1,
     CONF_THRESHOLD_GEN2,
-    COUNT_SENSOR_KEYS,
     DEFAULT_DAILY_MAINTENANCE,
     DEFAULT_DAILY_TIME,
     DEFAULT_FREEZE_ON_START,
@@ -216,26 +215,23 @@ def _arm_entry(
     # Off the loop is not free: both walks hold the GIL for their whole length
     # (~0.3 s for gc.get_freeze_count() with ~3.5 M frozen objects on Python
     # 3.14), so the event loop stalls while they run all the same. The counts
-    # feed only the two count sensors, so while both are disabled there is
-    # nothing to sample for.
+    # feed only their own sensors, so each walk runs only while its sensor is on.
     @callback
-    def _counts_wanted() -> bool:
+    def _count_wanted(key: str) -> bool:
         registry = er.async_get(hass)
-        for key in COUNT_SENSOR_KEYS:
-            entity_id = registry.async_get_entity_id(
-                "sensor", DOMAIN, f"{entry.entry_id}_{key}"
-            )
-            if entity_id is None:
-                return True  # not registered yet (first start): sample
-            reg_entry = registry.async_get(entity_id)
-            if reg_entry is not None and reg_entry.disabled_by is None:
-                return True
-        return False
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_{key}"
+        )
+        if entity_id is None:
+            return True  # not registered yet (first start): sample
+        reg_entry = registry.async_get(entity_id)
+        return reg_entry is not None and reg_entry.disabled_by is None
 
     async def _sample_counts(_now=None) -> None:
-        if not _counts_wanted():
-            return
-        await controller.async_refresh_counts()
+        frozen = _count_wanted("frozen_objects")
+        tracked = _count_wanted("tracked_objects")
+        if frozen or tracked:
+            await controller.async_refresh_counts(frozen=frozen, tracked=tracked)
 
     sample_interval = timedelta(
         minutes=int(

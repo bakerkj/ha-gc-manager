@@ -126,22 +126,31 @@ class GcController:
                 # already succeeded, or stop the other sensors from updating.
                 self._log.exception("sensor update listener failed")
 
-    async def async_refresh_counts(self) -> None:
-        """Sample the frozen + tracked object counts off the loop.
+    async def async_refresh_counts(
+        self, *, frozen: bool = True, tracked: bool = True
+    ) -> None:
+        """Sample the requested object counts off the loop.
 
         Both walks are O(heap) and must never run on the event loop, so the
         sensors read these cached values instead of calling gc directly.
         """
 
-        def _counts() -> tuple[int, int]:
-            return gc.get_freeze_count(), len(gc.get_objects())
+        def _counts() -> tuple[int | None, int | None]:
+            return (
+                gc.get_freeze_count() if frozen else None,
+                len(gc.get_objects()) if tracked else None,
+            )
 
         async with self._lock:
             if self._closing:
                 return
-            self.frozen_count, self.tracked_count = await _async_wait(
+            frozen_count, tracked_count = await _async_wait(
                 self._hass.async_add_executor_job(_counts)
             )
+            if frozen_count is not None:
+                self.frozen_count = frozen_count
+            if tracked_count is not None:
+                self.tracked_count = tracked_count
         self._notify()
 
     async def async_close(self) -> None:

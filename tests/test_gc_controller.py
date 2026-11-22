@@ -230,6 +230,19 @@ async def test_async_refresh_counts_samples_off_loop(hass):
         assert controller.tracked_count == 4
 
 
+async def test_refresh_counts_walks_only_what_is_asked(hass):
+    g = MagicMock()
+    g.get_freeze_count.return_value = 1234
+    g.get_objects.return_value = [1, 2, 3, 4]
+    with patch("custom_components.gc_manager.gc_controller.gc", g):
+        controller = GcController(hass, _LOG)
+        controller.tracked_count = 99
+        await controller.async_refresh_counts(frozen=True, tracked=False)
+    g.get_objects.assert_not_called()
+    assert controller.frozen_count == 1234
+    assert controller.tracked_count == 99  # left as it was
+
+
 async def test_maintain_if_due_runs_and_debounces(hass):
     g = _const_gc()
     with patch("custom_components.gc_manager.gc_controller.gc", g):
