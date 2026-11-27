@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.6](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.5...v0.0.6) (2026-11-27)
+
+
+### Miscellaneous Chores
+
+* **deps:** lock file maintenance ([#110](https://github.com/bakerkj/ha-gc-manager/issues/110)) ([44fa5ba](https://github.com/bakerkj/ha-gc-manager/commit/44fa5ba1cf07a7d6b9c6bfaa18ce4174af55053f))
+* **deps:** update dependency uv to v0.13.10 ([#108](https://github.com/bakerkj/ha-gc-manager/issues/108)) ([cf2cec9](https://github.com/bakerkj/ha-gc-manager/commit/cf2cec92ec2f1b7c338acaf45165d44262444e63))
+* **deps:** update github-actions ([#106](https://github.com/bakerkj/ha-gc-manager/issues/106)) ([2ca4406](https://github.com/bakerkj/ha-gc-manager/commit/2ca440631cdbec4fef3b0f7e52a21d3674fff00d))
+
 ## [0.0.5](https://github.com/bakerkj/ha-gc-manager/compare/v0.0.4...v0.0.5) (2026-11-22)
 
 
